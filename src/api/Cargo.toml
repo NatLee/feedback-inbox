@@ -1,0 +1,55 @@
+[package]
+name = "feedback-inbox"
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+description = "Self-hosted inbox for website contact forms: one endpoint per site, e-mail and webhook notifications, a shared inbox to follow up"
+publish = false
+
+[lib]
+name = "feedback_inbox"
+path = "src/lib.rs"
+
+[[bin]]
+name = "feedback-inbox"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+csv = "1"
+# 通知的每個目標同時送
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+# 寄通知信。TLS 用 rustls，不需要系統的 OpenSSL
+lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls", "ring", "webpki-roots"] }
+# OsRng：密碼的 salt 和 session token 用作業系統的亂數
+rand_core = { version = "0.6", features = ["getrandom"] }
+# 送 webhook
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+# preserve_order：其他欄位照表單上的順序排
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+serde_urlencoded = "0.7"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+tokio = { version = "1", features = ["full"] }
+tower-http = { version = "0.6", features = ["fs", "trace", "set-header"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+
+# 密碼雜湊在未最佳化的 build 很慢；讓測試跑快一點。
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+strip = true

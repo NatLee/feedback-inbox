@@ -1,0 +1,38 @@
+services:
+  feedback-inbox:
+    build: .
+    image: feedback-inbox:latest
+    container_name: feedback-inbox
+    restart: unless-stopped
+    ports:
+      - "${FI_PORT:-8787}:8787"
+    volumes:
+      # SQLite 資料庫在這裡，請記得備份
+      - feedback-inbox-data:/app/data
+    environment:
+      # 外部看到的網址：表單網址和通知信裡的連結用它組，是 https 時登入 cookie 會加 Secure
+      FI_PUBLIC_URL: ${FI_PUBLIC_URL:-}
+      FI_COOKIE_SECURE: ${FI_COOKIE_SECURE:-}
+      # 前面有反向代理時設 true，訪客的 IP 才會是對的
+      FI_TRUST_PROXY: ${FI_TRUST_PROXY:-}
+      # 同一個 IP 一分鐘最多送幾次表單（預設 10，0 是不限制）
+      FI_RATE_LIMIT: ${FI_RATE_LIMIT:-}
+      # 寄通知信用的 SMTP；沒設 FI_SMTP_HOST 就不寄信，webhook 不受影響
+      FI_SMTP_HOST: ${FI_SMTP_HOST:-}
+      FI_SMTP_PORT: ${FI_SMTP_PORT:-}
+      FI_SMTP_USERNAME: ${FI_SMTP_USERNAME:-}
+      FI_SMTP_PASSWORD: ${FI_SMTP_PASSWORD:-}
+      FI_SMTP_FROM: ${FI_SMTP_FROM:-}
+      FI_SMTP_TLS: ${FI_SMTP_TLS:-}
+
+  # 試通知信用的假信箱：docker compose --profile mail up -d，信會出現在 http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: feedback-inbox-mailpit
+    profiles: [mail]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FI_MAILPIT_PORT:-8025}:8025"
+
+volumes:
+  feedback-inbox-data:
