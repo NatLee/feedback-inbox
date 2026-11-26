@@ -15,8 +15,9 @@ OUT = Path(__file__).resolve().parent / "images"
 
 async def main():
     async with async_playwright() as p:
-        options = {}
+        options = {"channel": os.environ.get("PLAYWRIGHT_CHANNEL", "chrome")}
         if os.environ.get("PLAYWRIGHT_CHROMIUM_EXECUTABLE"):
+            options.pop("channel", None)
             options["executable_path"] = os.environ["PLAYWRIGHT_CHROMIUM_EXECUTABLE"]
         browser = await p.chromium.launch(**options)
         context = await browser.new_context(viewport={"width": 1440, "height": 1050}, color_scheme="light", device_scale_factor=1)
@@ -43,13 +44,13 @@ async def main():
         detail = next((item for item in inbox["items"] if item["note_count"] > 0), inbox["items"][0])["id"]
         routes = [("/", "overview"), ("/inbox", "inbox"), (f"/inbox/{detail}", "detail"), (f"/sites/{sites[0]['id']}", "site")]
         for route, name in routes:
-            await shot(route, f"screenshot-{name}-light.png")
+            await shot(route, f"screenshot-{name}-light.png", full=name == "overview")
         await page.get_by_role("radio", name="深色", exact=True).click()
-        await shot("/", "screenshot-overview-dark.png")
+        await shot("/", "screenshot-overview-dark.png", full=True)
         await shot("/inbox", "screenshot-inbox-dark.png")
         await page.get_by_role("radio", name="淺色", exact=True).click()
         await page.set_viewport_size({"width": 390, "height": 844})
-        await shot("/inbox", "screenshot-mobile.png")
+        await shot("/", "screenshot-mobile.png", full=True)
         await page.get_by_role("button", name="開啟選單").click()
         await expect(page.get_by_role("button", name="關閉選單")).to_be_visible()
         await page.get_by_role("button", name="關閉選單").click()

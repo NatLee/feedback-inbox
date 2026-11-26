@@ -22,7 +22,12 @@ import {
 } from "../components/ui";
 import { STATUSES, STATUS_LABEL, timeAgo, dateTime } from "../lib/format";
 import { errorText, useAsync, useDebounced } from "../lib/hooks";
-import type { FeedbackFilter, Status, StatusFilter } from "../types";
+import type {
+  FeedbackAge,
+  FeedbackFilter,
+  Status,
+  StatusFilter,
+} from "../types";
 
 const PER_PAGE = 25;
 
@@ -47,6 +52,8 @@ export function InboxPage() {
   const [params, setParams] = useSearchParams();
   const status = (params.get("status") ?? "") as StatusFilter | "";
   const siteId = Number(params.get("site_id")) || undefined;
+  const age = (params.get("age") || undefined) as FeedbackAge | undefined;
+  const sort = (params.get("sort") || "newest") as "newest" | "oldest";
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
   const page = Math.max(1, Number(params.get("page")) || 1);
@@ -76,6 +83,8 @@ export function InboxPage() {
   }, [q]);
 
   const filter: FeedbackFilter = {
+    age,
+    sort: sort === "newest" ? undefined : sort,
     site_id: siteId,
     status: status || undefined,
     q: params.get("q") ?? undefined,
@@ -100,7 +109,9 @@ export function InboxPage() {
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
   const allSelected =
     items.length > 0 && items.every((i) => selected.has(i.id));
-  const filtered = Boolean(status || siteId || filter.q || from || to);
+  const filtered = Boolean(
+    status || siteId || filter.q || from || to || age || sort !== "newest",
+  );
 
   const toggle = (id: number) =>
     setSelected((current) => {
@@ -205,6 +216,30 @@ export function InboxPage() {
             onChange={(e) => set({ to: e.target.value || undefined })}
           />
         </div>
+        <select
+          className="input w-auto"
+          aria-label="收到多久"
+          value={age ?? ""}
+          onChange={(e) => set({ age: e.target.value || undefined })}
+        >
+          <option value="">不限收件時間</option>
+          <option value="fresh">未滿 24 小時</option>
+          <option value="waiting">1–7 天內</option>
+          <option value="overdue">已滿 7 天</option>
+        </select>
+        <select
+          className="input w-auto"
+          aria-label="排序"
+          value={sort}
+          onChange={(e) =>
+            set({
+              sort: e.target.value === "newest" ? undefined : e.target.value,
+            })
+          }
+        >
+          <option value="newest">最新來信優先</option>
+          <option value="oldest">最舊來信優先</option>
+        </select>
         {filtered && (
           <button
             className="btn btn-ghost"

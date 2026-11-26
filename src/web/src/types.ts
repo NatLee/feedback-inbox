@@ -112,7 +112,11 @@ export interface FeedbackPage {
 /** `open` 是還沒處理完的（未處理＋處理中）；不給的話是垃圾訊息以外的全部 */
 export type StatusFilter = Status | "open" | "all";
 
+export type FeedbackAge = "fresh" | "waiting" | "overdue";
+
 export interface FeedbackFilter {
+  age?: FeedbackAge;
+  sort?: "newest" | "oldest";
   site_id?: number;
   status?: StatusFilter;
   q?: string;
@@ -167,6 +171,7 @@ export interface SiteSummary {
 }
 
 export interface Stats {
+  open_age: Record<FeedbackAge, number>;
   by_status: Record<Status, number>;
   last_7_days: number;
   previous_7_days: number;

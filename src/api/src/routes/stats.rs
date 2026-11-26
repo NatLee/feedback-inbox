@@ -50,6 +50,16 @@ pub async fn overview(
 
     // 最近 30 天每天幾則（不算垃圾訊息），照使用者的時區切日
     let now = Utc::now();
+    let mut open_age = serde_json::Map::new();
+    for age in ["fresh", "waiting", "overdue"] {
+        let mut qb = QueryBuilder::new(
+            "SELECT COUNT(*) FROM feedback f WHERE f.status IN ('new', 'in_progress')",
+        );
+        push_visible(&mut qb, &user);
+        feedback::push_age(&mut qb, age, now)?;
+        let count: i64 = qb.build_query_scalar().fetch_one(&state.db).await?;
+        open_age.insert(age.to_owned(), json!(count));
+    }
     let today = (now + Duration::minutes(tz_offset)).date_naive();
     let first_day = today - Duration::days(DAYS - 1);
     let since = first_day.and_hms_opt(0, 0, 0).unwrap().and_utc() - Duration::minutes(tz_offset);
@@ -115,6 +125,7 @@ pub async fn overview(
 
     Ok(Json(json!({
         "by_status": by_status,
+        "open_age": open_age,
         "last_7_days": sum(days - 7..days),
         "previous_7_days": sum(days - 14..days - 7),
         "daily": daily,

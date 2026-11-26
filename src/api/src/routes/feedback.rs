@@ -101,12 +101,44 @@ pub struct Filter {
     /// 沒給的話是垃圾訊息以外的全部。
     status: Option<String>,
     q: Option<String>,
+    age: Option<String>,
+    sort: Option<String>,
     from: Option<String>,
     to: Option<String>,
     page: Option<u32>,
     per_page: Option<u32>,
     /// 匯出時把時間換成當地時間用：比 UTC 快幾分鐘（台北是 480）
     tz_offset: Option<i32>,
+}
+
+/// Received-age buckets, shared by the triage counts and list/export filters.
+pub fn push_age(qb: &mut QueryBuilder<'_, Sqlite>, age: &str, now: DateTime<Utc>) -> AppResult<()> {
+    let day = db::format_time(now - Duration::days(1));
+    let week = db::format_time(now - Duration::days(7));
+    match age {
+        "fresh" => {
+            qb.push(" AND f.created_at > ").push_bind(day);
+        }
+        "waiting" => {
+            qb.push(" AND f.created_at <= ")
+                .push_bind(day)
+                .push(" AND f.created_at > ")
+                .push_bind(week);
+        }
+        "overdue" => {
+            qb.push(" AND f.created_at <= ").push_bind(week);
+        }
+        _ => return Err(AppError::bad("age 只能是 fresh、waiting 或 overdue")),
+    }
+    Ok(())
+}
+
+fn order_of(sort: Option<&str>) -> AppResult<&'static str> {
+    match sort.unwrap_or("newest") {
+        "newest" => Ok("f.created_at DESC, f.id DESC"),
+        "oldest" => Ok("f.created_at ASC, f.id ASC"),
+        _ => Err(AppError::bad("sort 只能是 newest 或 oldest")),
+    }
 }
 
 fn parse_time(text: &str, label: &str) -> AppResult<String> {
@@ -145,6 +177,7 @@ fn push_filters(
     qb: &mut QueryBuilder<'_, Sqlite>,
     user: &CurrentUser,
     filter: &Filter,
+    now: DateTime<Utc>,
 ) -> AppResult<()> {
     qb.push(" WHERE 1 = 1");
     push_visible(qb, user);
@@ -163,6 +196,9 @@ fn push_filters(
             qb.push(" AND f.status = ").push_bind(status.to_owned());
         }
         Some(other) => return Err(AppError::bad(format!("沒有「{other}」這個狀態"))),
+    }
+    if let Some(age) = &filter.age {
+        push_age(qb, age, now)?;
     }
     if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
         let pattern = like_pattern(q);
@@ -197,6 +233,8 @@ pub async fn list(
     user: CurrentUser,
     Query(filter): Query<Filter>,
 ) -> AppResult<Json<Value>> {
+    let now = Utc::now();
+    let order = order_of(filter.sort.as_deref())?;
     let per_page = filter
         .per_page
         .unwrap_or(DEFAULT_PER_PAGE)
@@ -204,12 +242,14 @@ pub async fn list(
     let page = filter.page.unwrap_or(1).max(1);
 
     let mut count = QueryBuilder::new("SELECT COUNT(*) FROM feedback f");
-    push_filters(&mut count, &user, &filter)?;
+    push_filters(&mut count, &user, &filter, now)?;
     let total: i64 = count.build_query_scalar().fetch_one(&state.db).await?;
 
     let mut qb = QueryBuilder::new(SELECT);
-    push_filters(&mut qb, &user, &filter)?;
-    qb.push(" ORDER BY f.created_at DESC, f.id DESC LIMIT ")
+    push_filters(&mut qb, &user, &filter, now)?;
+    qb.push(" ORDER BY ")
+        .push(order)
+        .push(" LIMIT ")
         .push_bind(i64::from(per_page))
         .push(" OFFSET ")
         .push_bind(i64::from(page - 1) * i64::from(per_page));
@@ -514,9 +554,13 @@ pub async fn export(
     Query(filter): Query<Filter>,
 ) -> AppResult<Response> {
     let tz_offset = filter.tz_offset.unwrap_or(0).clamp(-14 * 60, 14 * 60);
+    let now = Utc::now();
+    let order = order_of(filter.sort.as_deref())?;
     let mut qb = QueryBuilder::new(SELECT);
-    push_filters(&mut qb, &user, &filter)?;
-    qb.push(" ORDER BY f.created_at DESC, f.id DESC LIMIT ")
+    push_filters(&mut qb, &user, &filter, now)?;
+    qb.push(" ORDER BY ")
+        .push(order)
+        .push(" LIMIT ")
         .push_bind(MAX_EXPORT_ROWS);
     let rows: Vec<Row> = qb.build_query_as().fetch_all(&state.db).await?;
 
@@ -596,5 +640,52 @@ mod tests {
             "2026-01-04T16:00:00Z"
         );
         assert!(parse_time("2026-01-05", "from").is_err());
+    }
+}
+
+#[cfg(test)]
+mod triage_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn age_boundaries_are_disjoint_at_one_and_seven_days() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query("CREATE TABLE feedback (id INTEGER, created_at TEXT)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let now = DateTime::parse_from_rfc3339("2026-03-15T12:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        for (id, seconds) in [
+            (1, 86399),
+            (2, 86400),
+            (3, 604799),
+            (4, 604800),
+            (5, 604801),
+        ] {
+            sqlx::query("INSERT INTO feedback VALUES (?,?)")
+                .bind(id)
+                .bind(db::format_time(now - Duration::seconds(seconds)))
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        for (age, ids) in [
+            ("fresh", vec![1_i64]),
+            ("waiting", vec![2, 3]),
+            ("overdue", vec![4, 5]),
+        ] {
+            let mut qb = QueryBuilder::new("SELECT f.id FROM feedback f WHERE 1=1");
+            push_age(&mut qb, age, now).unwrap();
+            qb.push(" ORDER BY f.id");
+            assert_eq!(
+                qb.build_query_scalar::<i64>()
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap(),
+                ids
+            );
+        }
     }
 }
