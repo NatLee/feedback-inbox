@@ -80,9 +80,12 @@ const THEMES: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
   { value: "system", label: "跟系統", icon: Monitor },
 ];
 
-function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeChoice>(storedTheme);
-  useEffect(() => applyTheme(theme), [theme]);
+interface ThemeControls {
+  theme: ThemeChoice;
+  onThemeChange: (theme: ThemeChoice) => void;
+}
+
+function ThemeToggle({ theme, onThemeChange }: ThemeControls) {
   return (
     <div
       className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800"
@@ -95,7 +98,7 @@ function ThemeToggle() {
           role="radio"
           aria-checked={theme === value}
           title={label}
-          onClick={() => setTheme(value)}
+          onClick={() => onThemeChange(value)}
           className={`flex flex-1 items-center justify-center rounded-md py-1 transition-colors ${
             theme === value
               ? "bg-white text-brand-700 shadow-sm dark:bg-zinc-950 dark:text-brand-300"
@@ -110,7 +113,7 @@ function ThemeToggle() {
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ theme, onThemeChange }: ThemeControls) {
   const { logout, meta } = useApp();
   const user = useUser();
   return (
@@ -139,12 +142,14 @@ function SidebarFooter() {
           <span className="text-xs">登出</span>
         </button>
       </div>
-      <ThemeToggle />
+      <ThemeToggle theme={theme} onThemeChange={onThemeChange} />
     </div>
   );
 }
 
 export function Layout() {
+  const [theme, setTheme] = useState<ThemeChoice>(storedTheme);
+  useEffect(() => applyTheme(theme), [theme]);
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
@@ -170,7 +175,7 @@ export function Layout() {
             <Link to="/inbox?status=open">查看待處理訊息 →</Link>
           </div>
         </div>
-        <SidebarFooter />
+        <SidebarFooter theme={theme} onThemeChange={setTheme} />
       </aside>
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/90 px-4 py-2.5 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-900/90">
@@ -204,7 +209,7 @@ export function Layout() {
             <div className="flex-1 overflow-y-auto">
               <SidebarNav onNavigate={() => setOpen(false)} />
             </div>
-            <SidebarFooter />
+            <SidebarFooter theme={theme} onThemeChange={setTheme} />
           </div>
         </div>
       )}

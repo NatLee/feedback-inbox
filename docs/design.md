@@ -16,12 +16,14 @@
 3. 檢查登入 session、同源保護、輸入驗證、網站成員範圍、匯出與管理員操作，並執行原有整合測試。收件搜尋、狀態、備註、CSV 公式防護、公開表單驗證及來源限制均由原有測試涵蓋。
 4. Vite 字串形式的代理設定會改寫 `Host`，導致瀏覽器登入被同源保護拒絕。代理改成明確保留 `Host`，並透過真實瀏覽器登入驗證。表單代理另限定為 `/f` 路徑，避免誤攔 `/favicon.svg`。
 
+5. 桌面與手機主題控制共用 Layout 的狀態，避免手機選深色後，桌面按鈕仍停在舊選項。新增回歸測試驗證雙控制同步，並能切回淺色。
+
 ## 驗證
 
 - `cargo fmt --check`
 - `CARGO_BUILD_JOBS=2 cargo clippy --all-targets -- -D warnings`
 - `CARGO_BUILD_JOBS=2 cargo test`：25 個單元測試、15 個整合測試通過。
-- `pnpm test`：8 個測試通過。
+- `pnpm test`：9 個測試通過。
 - `pnpm build`：TypeScript 與 Vite 正式建置通過。
 - 原有 `docs/smoke-test.sh` 對另一個空的暫存資料庫通過；未使用現有的使用者資料庫。
 - Chromium：1440px 桌面與 390px 手機、淺色／深色、登入、選單與主題切換、主要頁面與額外設定頁面。檢查無頁面 JavaScript 錯誤與水平溢出。
