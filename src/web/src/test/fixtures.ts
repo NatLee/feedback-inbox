@@ -65,6 +65,7 @@ export const detail: FeedbackDetail = {
 };
 
 export const emptyStats: Stats = {
+  open_age: { fresh: 0, waiting: 0, overdue: 0 },
   by_status: { new: 0, in_progress: 0, done: 0, spam: 0 },
   last_7_days: 0,
   previous_7_days: 0,

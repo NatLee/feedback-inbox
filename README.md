@@ -18,8 +18,8 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-inbox-dark.png">
-    <img src="docs/images/screenshot-inbox-light.png" alt="收件匣：依狀態、網站、日期篩選，可以搜尋和整批改狀態" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-overview-dark.png">
+    <img src="docs/images/screenshot-overview-light.png" alt="來信工作台：等待時間分流、來信日曆與網站負載" width="100%">
   </picture>
 </p>
 
@@ -30,7 +30,8 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 - **通知**：寄信給負責人（直接按「回覆」就是回給留言的人），以及 webhook。Slack 和 Discord 的 webhook 網址會自動用它們的格式，其他網址收到完整的 JSON。每一則通知有沒有送出去都查得到。
 - **處理流程**：未處理 → 處理中 → 已完成，或標成垃圾訊息。可以寫備註給同事看，誰在什麼時候改了狀態都留著。
 - **擋垃圾訊息**：藏起來的欄位（honeypot）、同一個 IP 的次數限制、限定只收哪些網站送來的表單。
-- **搜尋、篩選、整批處理、CSV 匯出**，以及總覽頁：各狀態的數量、最近 30 天每天幾則、每個網站還有幾則待處理。
+- **來信工作台**：狀態圓環、等待時間分流、30 天來信日曆、網站處理負載。點圖表直接進入對應來信；等待最久的信件可優先處理。
+- **搜尋、篩選、整批處理、CSV 匯出**：網站、狀態、日期與收到多久的篩選可一起使用，CSV 保留同樣的條件與排序。
 - **帳號**：第一個打開網頁的人建立管理員，沒有預設帳號，也沒有預設密碼。密碼用 Argon2 雜湊，登入是 HttpOnly cookie。
 - 淺色和深色模式。
 
@@ -40,9 +41,11 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 ### 今日工作桌
 
-總覽先顯示待處理對話的入口，再看未處理／處理中／已完成數量、來信趨勢和最新訊息。
+總覽將待處理來信分成未滿 24 小時、1–7 天內、已滿 7 天三列。點選後以最舊來信優先；等待時間從收件時間計算，不是回覆速度或 SLA。狀態圓環顯示非垃圾來信的全量分布，中央顯示待處理封數。
 
-![今日工作桌](docs/images/screenshot-overview-light.png)
+30 天日曆按瀏覽器時區切日，點任一日期會帶入收件匣的起訖日期。網站負載依待處理封數排序，可只顯示仍有待處理訊息的網站。
+
+![收件匣與相同條件的 CSV 匯出](docs/images/screenshot-inbox-light.png)
 
 ### 閱讀與接續對話
 
@@ -61,7 +64,7 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 ![登入](docs/images/screenshot-login-light.png)
 ![深色工作桌](docs/images/screenshot-overview-dark.png)
-<img src="docs/images/screenshot-mobile.png" alt="手機收件匣" width="390">
+<img src="docs/images/screenshot-mobile.png" alt="手機來信工作台" width="390">
 
 </details>
 
@@ -175,7 +178,7 @@ API 和 webhook 的格式在 [docs/api.md](docs/api.md)。
 
 ## 設計與驗證
 
-[設計與實作紀錄](docs/design.md) 說明版型、響應式、後端修正及驗證範圍。封面是可編輯的 [SVG](docs/images/cover.svg)；應用畫面由 [擷取腳本](docs/capture-screenshots.py) 對隔離的 demo 執行個體重拍。
+[視覺分析設計與驗證](docs/visual-insights.md) 說明新工作台的資料定義與測試；[原版型紀錄](docs/design.md) 說明版型、響應式、後端修正及驗證範圍。封面是可編輯的 [SVG](docs/images/cover.svg)；應用畫面由 [擷取腳本](docs/capture-screenshots.py) 對隔離的 demo 執行個體重拍。
 
 ## 授權
 

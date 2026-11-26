@@ -1,188 +1,50 @@
-import {
-  ArrowRight,
-  CheckCircle2,
-  CircleDot,
-  Globe,
-  Inbox,
-  Loader,
-  TrendingDown,
-  TrendingUp,
-  type LucideIcon,
-} from "lucide-react";
-import type { ReactNode } from "react";
+import { ArrowRight, Globe, Inbox } from "lucide-react";
 import { Link } from "react-router";
 import { api } from "../api";
 import { FeedbackRow } from "../components/feedback";
 import { PageBody } from "../components/Layout";
 import {
-  Badge,
-  Empty,
-  ErrorBanner,
-  Loading,
-  PageHeader,
-} from "../components/ui";
+  ArrivalCalendar,
+  SiteWorkload,
+  TriageBoard,
+} from "../components/TriageBoard";
+import { Empty, ErrorBanner, PageHeader } from "../components/ui";
 import { useUser } from "../context";
-import { timeAgo } from "../lib/format";
 import { useAsync } from "../lib/hooks";
-import type { Stats } from "../types";
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  to,
-  children,
-}: {
-  label: string;
-  value: number;
-  icon: LucideIcon;
-  to?: string;
-  children?: ReactNode;
-}) {
-  const body = (
-    <>
-      <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-        <span className="text-xs font-medium">{label}</span>
-        <Icon className="size-4" />
-      </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">
-        {value.toLocaleString()}
-      </p>
-      <p className="mt-1 min-h-4 text-xs text-zinc-500 dark:text-zinc-400">
-        {children}
-      </p>
-    </>
-  );
-  return to ? (
-    <Link
-      to={to}
-      className="mail-stat card block p-4 transition-colors hover:border-brand-300 dark:hover:border-brand-700"
-    >
-      {body}
-    </Link>
-  ) : (
-    <div className="mail-stat card p-4">{body}</div>
-  );
-}
-
-/** 這 7 天和前 7 天比。 */
-function Trend({ current, previous }: { current: number; previous: number }) {
-  if (previous === 0)
-    return <>{current === 0 ? "前 7 天也沒有訊息" : "前 7 天沒有訊息"}</>;
-  const change = Math.round(((current - previous) / previous) * 100);
-  if (change === 0) return <>和前 7 天一樣</>;
-  const Icon = change > 0 ? TrendingUp : TrendingDown;
-  return (
-    <span className="inline-flex items-center gap-1">
-      <Icon className="size-3.5" />
-      比前 7 天{change > 0 ? "多" : "少"} {Math.abs(change)}%
-    </span>
-  );
-}
-
-/** 最近 30 天每天幾則的長條圖。 */
-function DailyChart({ daily }: { daily: Stats["daily"] }) {
-  const max = Math.max(1, ...daily.map((d) => d.count));
-  const total = daily.reduce((sum, d) => sum + d.count, 0);
-  const label = (date: string) => date.slice(5).replace("-", "/");
-  return (
-    <section className="mail-chart card p-4 sm:p-5">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold">最近 30 天</h2>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          共 {total.toLocaleString()} 則（不含垃圾訊息）
-        </span>
-      </div>
-      <div
-        className="mt-4 flex h-36 items-end gap-[3px]"
-        role="img"
-        aria-label={`最近 30 天共 ${total} 則訊息`}
-      >
-        {daily.map((d) => (
-          <div
-            key={d.date}
-            className="group relative flex h-full flex-1 items-end"
-          >
-            <div
-              className={`w-full rounded-t-sm transition-colors ${
-                d.count === 0
-                  ? "bg-zinc-200 dark:bg-zinc-800"
-                  : "bg-brand-500 group-hover:bg-brand-600 dark:bg-brand-500 dark:group-hover:bg-brand-400"
-              }`}
-              style={{
-                height:
-                  d.count === 0 ? 2 : `${Math.max(6, (d.count / max) * 100)}%`,
-              }}
-            />
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 rounded-md bg-zinc-900 px-1.5 py-0.5 text-[11px] whitespace-nowrap text-white group-hover:block dark:bg-white dark:text-zinc-900">
-              {label(d.date)}・{d.count} 則
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-1.5 flex justify-between text-[11px] text-zinc-500 tabular-nums dark:text-zinc-400">
-        <span>{label(daily[0]?.date ?? "")}</span>
-        <span>{label(daily[Math.floor(daily.length / 2)]?.date ?? "")}</span>
-        <span>今天</span>
-      </div>
-    </section>
-  );
-}
-
-function SiteList({ sites }: { sites: Stats["sites"] }) {
-  return (
-    <section className="card">
-      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 sm:px-5 dark:border-zinc-800">
-        <h2 className="text-sm font-semibold">網站</h2>
-        <Link
-          to="/sites"
-          className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline dark:text-brand-300"
-        >
-          全部 <ArrowRight className="size-3" />
-        </Link>
-      </div>
-      <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
-        {sites.map((s) => (
-          <li key={s.id}>
-            <Link
-              to={`/inbox?site_id=${s.id}&status=open`}
-              className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-zinc-50 sm:px-5 dark:hover:bg-zinc-800/50"
-            >
-              <span className="min-w-0">
-                <span className="flex items-center gap-2 text-sm font-medium">
-                  <span className="truncate">{s.name}</span>
-                  {!s.active && <Badge>已停收</Badge>}
-                </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                  共 {s.total.toLocaleString()} 則・
-                  {s.last_at ? `最新 ${timeAgo(s.last_at)}` : "還沒有訊息"}
-                </span>
-              </span>
-              {s.unhandled > 0 ? (
-                <Badge tone="amber">{s.unhandled} 則待處理</Badge>
-              ) : (
-                <Badge tone="green">都處理完了</Badge>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
 
 export function Dashboard() {
   const user = useUser();
-  const { data, error } = useAsync(() => api.stats(), []);
-
+  const { data, error, reload } = useAsync(() => api.stats(), []);
   return (
     <PageBody>
       <PageHeader
         title={`${user.display_name}，你好`}
-        subtitle="今天的對話，從這裡開始。"
+        subtitle="來信工作台 · 看見等待，再開始回應。"
+        actions={
+          <Link to="/inbox" className="btn btn-secondary">
+            打開收件匣 <ArrowRight size={15} />
+          </Link>
+        }
       />
-      {error && <ErrorBanner message={error} />}
-      {!data && !error && <Loading />}
+      {error && (
+        <>
+          <ErrorBanner message={error} />
+          <button
+            className="btn btn-secondary mb-4"
+            onClick={() => void reload()}
+          >
+            重新載入工作台
+          </button>
+        </>
+      )}
+      {!data && !error && (
+        <div role="status" className="insight-loading">
+          <span>正在整理來信與等待時間…</span>
+          <div />
+          <div />
+          <div />
+        </div>
+      )}
       {data && data.sites.length === 0 && (
         <div className="card">
           <Empty
@@ -193,124 +55,46 @@ export function Dashboard() {
           >
             {user.role === "admin" ? (
               <>
-                每個網站會有一個表單網址，把表單的{" "}
-                <code className="font-mono">action</code> 指過去就能開始收訊息。
-                <div className="mt-4">
-                  <Link to="/sites" className="btn btn-primary">
-                    <Globe className="size-4" /> 新增網站
-                  </Link>
-                </div>
+                <p>建立網站，取得表單收件網址，就能在這裡追蹤每一封來信。</p>
+                <Link to="/sites" className="btn btn-primary mt-4">
+                  新增網站 <ArrowRight size={15} />
+                </Link>
               </>
             ) : (
-              "請管理員把你加進網站的負責人，就能看到那個網站的訊息。"
+              "請管理員將你加入網站的負責人。"
             )}
           </Empty>
         </div>
       )}
       {data && data.sites.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <div className="desk-summary">
-            <section className="letter-welcome">
-              <span className="eyebrow">THE DAILY POST / 每日來信</span>
-              <span className="postmark" aria-hidden="true">
-                <Inbox />
-                <small>
-                  RECEIVED
-                  <br />
-                  WITH CARE
-                </small>
-              </span>
-              <h2>
-                有話想說的人，
-                <br />
-                <em>我們收到了。</em>
-              </h2>
-              <p>
-                所有網站的聲音，在同一張工作桌上。
-                <br />
-                先從還沒完成的 {data.by_status.new +
-                  data.by_status.in_progress}{" "}
-                則對話開始。
-              </p>
-              <Link to="/inbox?status=open" className="btn btn-primary">
-                打開待處理信件 <ArrowRight className="size-4" />
-              </Link>
-            </section>
-            <div className="mail-stats">
-              <StatCard
-                label="未處理"
-                value={data.by_status.new}
-                icon={CircleDot}
-                to="/inbox?status=new"
-              >
-                還沒有人看過
-              </StatCard>
-              <StatCard
-                label="處理中"
-                value={data.by_status.in_progress}
-                icon={Loader}
-                to="/inbox?status=in_progress"
-              >
-                有人在跟了
-              </StatCard>
-              <StatCard
-                label="已完成"
-                value={data.by_status.done}
-                icon={CheckCircle2}
-                to="/inbox?status=done"
-              >
-                另有 {data.by_status.spam.toLocaleString()} 則垃圾訊息
-              </StatCard>
-              <StatCard label="最近 7 天" value={data.last_7_days} icon={Inbox}>
-                <Trend
-                  current={data.last_7_days}
-                  previous={data.previous_7_days}
-                />
-              </StatCard>
-            </div>
+        <div className="triage-layout">
+          <TriageBoard data={data} />
+          <div className="triage-secondary">
+            <ArrivalCalendar data={data} />
+            <SiteWorkload sites={data.sites} />
           </div>
-          <div className="desk-activity">
-            <DailyChart daily={data.daily} />
-            <div className="dispatch-note">
-              <span className="eyebrow">WORKING TOGETHER</span>
-              <h3>
-                接住每一個
-                <br />
-                重要的訊息。
-              </h3>
-              <p>在收件匣更新狀態、留下備註，讓下一位夥伴知道對話走到哪裡。</p>
-              <Link to="/inbox">
-                前往收件匣 <ArrowRight className="size-4" />
-              </Link>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <section className="card lg:col-span-3">
-              <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 sm:px-5 dark:border-zinc-800">
-                <h2 className="text-sm font-semibold">最新訊息</h2>
-                <Link
-                  to="/inbox"
-                  className="inline-flex items-center gap-1 text-xs text-brand-700 hover:underline dark:text-brand-300"
-                >
-                  收件匣 <ArrowRight className="size-3" />
-                </Link>
+          <section className="card">
+            <div className="insight-heading recent-heading">
+              <div>
+                <span className="eyebrow">THE LATEST / 新到的信</span>
+                <h3>最近來信</h3>
               </div>
-              {data.recent.length === 0 ? (
-                <Empty icon={Inbox} title="還沒有訊息">
-                  表單一有人送出，就會出現在這裡。
-                </Empty>
-              ) : (
-                <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {data.recent.map((item) => (
-                    <FeedbackRow key={item.id} item={item} />
-                  ))}
-                </div>
-              )}
-            </section>
-            <div className="lg:col-span-2">
-              <SiteList sites={data.sites} />
+              <Link to="/inbox" className="btn btn-ghost">
+                全部來信 <ArrowRight size={14} />
+              </Link>
             </div>
-          </div>
+            {data.recent.length ? (
+              <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                {data.recent.map((item) => (
+                  <FeedbackRow key={item.id} item={item} />
+                ))}
+              </div>
+            ) : (
+              <Empty icon={Inbox} title="第一封來信，還在路上">
+                表單有人送出後，這裡會顯示來信。可先到網站設定確認收件網址與必填欄位。
+              </Empty>
+            )}
+          </section>
         </div>
       )}
     </PageBody>

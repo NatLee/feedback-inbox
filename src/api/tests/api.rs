@@ -1345,3 +1345,64 @@ async fn concurrent_setup_creates_exactly_one_administrator() {
         .unwrap();
     assert_eq!(count, 1);
 }
+
+#[tokio::test]
+async fn triage_age_counts_match_filtered_lists_and_exports() {
+    let t = TestApp::new().await;
+    let admin = t.admin().await;
+    let (uid, member) = t.member(&admin, "triage").await;
+    let site = t
+        .site(&admin, json!({"name":"Visible", "member_ids":[uid]}))
+        .await;
+    let hidden = t.site(&admin, json!({"name":"Hidden"})).await;
+    for (i, days, status, site_id) in [
+        (1, 0, "new", site["id"].as_i64().unwrap()),
+        (2, 2, "in_progress", site["id"].as_i64().unwrap()),
+        (3, 8, "new", site["id"].as_i64().unwrap()),
+        (4, 15, "new", site["id"].as_i64().unwrap()),
+        (5, 9, "done", site["id"].as_i64().unwrap()),
+        (6, 9, "spam", site["id"].as_i64().unwrap()),
+        (7, 9, "new", hidden["id"].as_i64().unwrap()),
+    ] {
+        let at = feedback_inbox::db::format_time(chrono::Utc::now() - chrono::Duration::days(days));
+        sqlx::query("INSERT INTO feedback(site_id,name,message,status,created_at,updated_at) VALUES(?,?,?,?,?,?)")
+            .bind(site_id).bind(format!("Letter {i}")).bind("Test").bind(status).bind(&at).bind(&at)
+            .execute(&t.state.db).await.unwrap();
+    }
+    let stats = t.get(&member, "/api/stats").await;
+    assert_eq!(
+        stats["open_age"],
+        json!({"fresh":1,"waiting":1,"overdue":2})
+    );
+    for (age, count) in [("fresh", 1), ("waiting", 1), ("overdue", 2)] {
+        let list = t
+            .get(
+                &member,
+                &format!("/api/feedback?status=open&age={age}&sort=oldest"),
+            )
+            .await;
+        assert_eq!(list["total"], count);
+        let csv = t
+            .get(
+                &member,
+                &format!("/api/feedback/export?status=open&age={age}&sort=oldest"),
+            )
+            .await;
+        assert_eq!(csv.as_str().unwrap().lines().count(), count as usize + 1);
+        assert!(!csv.as_str().unwrap().contains("Letter 7"));
+    }
+    let list = t
+        .get(&member, "/api/feedback?status=open&age=overdue&sort=oldest")
+        .await;
+    assert_eq!(list["items"][0]["name"], "Letter 4");
+    for query in ["age=bogus", "sort=bogus"] {
+        for path in ["/api/feedback", "/api/feedback/export"] {
+            assert_eq!(
+                t.call(Some(&admin), Method::GET, &format!("{path}?{query}"), None)
+                    .await
+                    .0,
+                StatusCode::BAD_REQUEST
+            );
+        }
+    }
+}

@@ -144,10 +144,12 @@ curl -H 'content-type: application/json' \
 |---|---|
 | `site_id` | 只看某個網站 |
 | `status` | `new`、`in_progress`、`done`、`spam`；`open` 是未處理加處理中；`all` 是全部。沒給的話是垃圾訊息以外的全部 |
+| `age` | 收件年齡：`fresh` 未滿 24 小時；`waiting` 已滿 24 小時、未滿 7 天；`overdue` 已滿 7 天。可與 `status` 等條件交集，不代表 SLA 逾時 |
+| `sort` | `newest`（預設）或 `oldest`，清單與 CSV 使用相同排序 |
 | `q` | 在姓名、信箱、電話、公司、訊息裡找 |
 | `from`、`to` | 時間範圍（RFC 3339），含 `from`、不含 `to` |
 | `page`、`per_page` | `per_page` 最多 100 |
 
 ### 統計
 
-`GET /api/stats?tz_offset=480` 回總覽頁用的數字：`by_status`、`last_7_days`、`previous_7_days`、`daily`（最近 30 天每天幾則，不含垃圾訊息）、`sites`、`recent`。
+`GET /api/stats?tz_offset=480` 回總覽頁用的數字：`by_status`、`open_age`（`fresh`／`waiting`／`overdue` 三個互斥區間，只計 new 與 in_progress）、`last_7_days`、`previous_7_days`、`daily`（最近 30 天每天幾則，不含垃圾訊息）、`sites`、`recent`。
