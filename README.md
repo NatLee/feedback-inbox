@@ -1,14 +1,11 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/hero-dark.png">
-    <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/hero-light.png" alt="Feedback Inbox：網站表單的收件匣" width="100%">
-  </picture>
+  <img src="docs/images/cover.svg" alt="Feedback Inbox：每一封來信，都值得回應" width="100%">
 </p>
 
 <p align="center">
   <a href="https://github.com/NatLee/feedback-inbox/actions/workflows/ci.yml"><img src="https://github.com/NatLee/feedback-inbox/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/backend-Rust%20%2B%20axum-b7410e" alt="Rust + axum">
-  <img src="https://img.shields.io/badge/frontend-React%20%2B%20Tailwind-0d9488" alt="React + Tailwind">
+  <img src="https://img.shields.io/badge/frontend-React%20%2B%20Tailwind-b5412b" alt="React + Tailwind">
   <img src="https://img.shields.io/badge/docker-one%20image-2496ed" alt="Docker">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
 </p>
@@ -21,8 +18,8 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-inbox-dark.png">
-    <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-inbox-light.png" alt="收件匣：依狀態、網站、日期篩選，可以搜尋和整批改狀態" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-inbox-dark.png">
+    <img src="docs/images/screenshot-inbox-light.png" alt="收件匣：依狀態、網站、日期篩選，可以搜尋和整批改狀態" width="100%">
   </picture>
 </p>
 
@@ -37,64 +34,36 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 - **帳號**：第一個打開網頁的人建立管理員，沒有預設帳號，也沒有預設密碼。密碼用 Argon2 雜湊，登入是 HttpOnly cookie。
 - 淺色和深色模式。
 
-## 畫面
+## 畫面與工作流程
 
-### 總覽
+以暖紙色、赤陶紅與信件工作桌為主題，固定的收件側欄讓團隊在總覽、收件匣和網站設定間移動。所有數字來自 API；截圖使用專案內建的虛構 demo 資料。
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-overview-dark.png">
-    <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-overview-light.png" alt="總覽：未處理、處理中、已完成的數量，最近 30 天的長條圖，最新訊息和各網站的待處理數" width="100%">
-  </picture>
-</p>
+### 今日工作桌
 
-### 一則訊息
+總覽先顯示待處理對話的入口，再看未處理／處理中／已完成數量、來信趨勢和最新訊息。
 
-聯絡方式、訊息內容、表單裡其他的欄位；右邊是從哪一頁送出的，以及通知有沒有送到。下面是處理紀錄和給同事看的備註。
+![今日工作桌](docs/images/screenshot-overview-light.png)
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-detail-dark.png">
-    <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-detail-light.png" alt="訊息內容、處理紀錄和備註，右邊是來源和通知的結果" width="100%">
-  </picture>
-</p>
+### 閱讀與接續對話
 
-### 網站設定
+信件式內容頁保留聯絡方式、狀態選單、備註、通知結果及時間紀錄。列表提供狀態分頁、搜尋、日期篩選、整批處理及 CSV 匯出。
 
-表單網址和可以直接複製的寫法，接著是必填欄位、允許的來源、負責人、通知。
+![訊息與團隊備註](docs/images/screenshot-detail-light.png)
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-site-dark.png">
-    <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-site-light.png" alt="網站設定：表單網址、HTML 和 JavaScript 的嵌入寫法" width="100%">
-  </picture>
-</p>
+### 網站與成員
+
+每個網站分別設定表單欄位、來源限制、負責人與通知方式。
+
+![網站設定](docs/images/screenshot-site-light.png)
 
 <details>
-<summary>整頁的設定</summary>
+<summary>登入、深色與手機畫面</summary>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-site-full-light.png" alt="網站設定整頁：基本設定、負責人、通知" width="100%">
-</p>
+![登入](docs/images/screenshot-login-light.png)
+![深色工作桌](docs/images/screenshot-overview-dark.png)
+<img src="docs/images/screenshot-mobile.png" alt="手機收件匣" width="390">
 
 </details>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-sites-light.png" alt="網站清單：每個網站的待處理數、負責人和通知方式" width="100%">
-</p>
-
-### 通知信和現成的表單頁
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-email-light.png" alt="通知信：網站名稱、留言的人、訊息內容和打開收件匣的按鈕" width="49%">
-  <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-form-light.png" alt="內建的表單頁" width="49%">
-</p>
-
-### 帳號
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/NatLee/feedback-inbox/main/docs/images/screenshot-settings-light.png" alt="設定：個人資料、密碼、團隊的帳號" width="100%">
-</p>
 
 ## 快速開始
 
@@ -203,6 +172,10 @@ bash docs/smoke-test.sh http://127.0.0.1:8787   # 對一個空的執行個體跑
 ```
 
 API 和 webhook 的格式在 [docs/api.md](docs/api.md)。
+
+## 設計與驗證
+
+[設計與實作紀錄](docs/design.md) 說明版型、響應式、後端修正及驗證範圍。封面是可編輯的 [SVG](docs/images/cover.svg)；應用畫面由 [擷取腳本](docs/capture-screenshots.py) 對隔離的 demo 執行個體重拍。
 
 ## 授權
 

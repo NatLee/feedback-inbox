@@ -1,4 +1,14 @@
-import { ArrowLeft, Building2, CheckCircle2, ExternalLink, Mail, Phone, Send, Trash2, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  ExternalLink,
+  Mail,
+  Phone,
+  Send,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api";
@@ -10,22 +20,39 @@ import { STATUSES, STATUS_LABEL, dateTime, timeAgo } from "../lib/format";
 import { errorText, useAsync } from "../lib/hooks";
 import type { Delivery, FeedbackDetail, Note, Status } from "../types";
 
-const CHANNEL_LABEL: Record<Delivery["channel"], string> = { email: "通知信", webhook: "Webhook" };
+const CHANNEL_LABEL: Record<Delivery["channel"], string> = {
+  email: "通知信",
+  webhook: "Webhook",
+};
 
 function Contact({ detail }: { detail: FeedbackDetail }) {
   const rows = [
-    detail.email && { icon: Mail, text: detail.email, href: `mailto:${detail.email}` },
-    detail.phone && { icon: Phone, text: detail.phone, href: `tel:${detail.phone.replace(/[^\d+]/g, "")}` },
+    detail.email && {
+      icon: Mail,
+      text: detail.email,
+      href: `mailto:${detail.email}`,
+    },
+    detail.phone && {
+      icon: Phone,
+      text: detail.phone,
+      href: `tel:${detail.phone.replace(/[^\d+]/g, "")}`,
+    },
     detail.company && { icon: Building2, text: detail.company },
   ].filter((r) => !!r);
   if (rows.length === 0) return null;
   return (
     <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
       {rows.map(({ icon: Icon, text, href }) => (
-        <li key={text} className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
+        <li
+          key={text}
+          className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300"
+        >
           <Icon className="size-4 text-zinc-400" />
           {href ? (
-            <a className="hover:text-brand-700 hover:underline dark:hover:text-brand-300" href={href}>
+            <a
+              className="hover:text-brand-700 hover:underline dark:hover:text-brand-300"
+              href={href}
+            >
               {text}
             </a>
           ) : (
@@ -37,7 +64,13 @@ function Contact({ detail }: { detail: FeedbackDetail }) {
   );
 }
 
-function Notes({ detail, onChange }: { detail: FeedbackDetail; onChange: (next?: FeedbackDetail) => void }) {
+function Notes({
+  detail,
+  onChange,
+}: {
+  detail: FeedbackDetail;
+  onChange: (next?: FeedbackDetail) => void;
+}) {
   const me = useUser();
   const toast = useToast();
   const [body, setBody] = useState("");
@@ -67,7 +100,9 @@ function Notes({ detail, onChange }: { detail: FeedbackDetail; onChange: (next?:
 
   return (
     <section className="card">
-      <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold sm:px-5 dark:border-zinc-800">處理紀錄</h2>
+      <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold sm:px-5 dark:border-zinc-800">
+        處理紀錄
+      </h2>
       <ol className="flex flex-col gap-4 px-4 py-4 sm:px-5">
         <li className="flex gap-3 text-sm text-zinc-500 dark:text-zinc-400">
           <span className="mt-1.5 size-2 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-600" />
@@ -77,11 +112,18 @@ function Notes({ detail, onChange }: { detail: FeedbackDetail; onChange: (next?:
         </li>
         {detail.notes.map((note) =>
           note.kind === "status" ? (
-            <li key={note.id} className="flex gap-3 text-sm text-zinc-500 dark:text-zinc-400">
+            <li
+              key={note.id}
+              className="flex gap-3 text-sm text-zinc-500 dark:text-zinc-400"
+            >
               <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-400" />
               <span>
-                <span className="font-medium text-zinc-700 dark:text-zinc-200">{note.author}</span> 改成「
-                {STATUS_LABEL[note.body as Status] ?? note.body}」・{timeAgo(note.created_at)}
+                <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                  {note.author}
+                </span>{" "}
+                改成「
+                {STATUS_LABEL[note.body as Status] ?? note.body}」・
+                {timeAgo(note.created_at)}
               </span>
             </li>
           ) : (
@@ -92,11 +134,20 @@ function Notes({ detail, onChange }: { detail: FeedbackDetail; onChange: (next?:
               <div className="min-w-0 flex-1 rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
                 <div className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>
-                    <span className="font-medium text-zinc-700 dark:text-zinc-200">{note.author}</span>・
-                    <span title={dateTime(note.created_at)}>{timeAgo(note.created_at)}</span>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                      {note.author}
+                    </span>
+                    ・
+                    <span title={dateTime(note.created_at)}>
+                      {timeAgo(note.created_at)}
+                    </span>
                   </span>
                   {(note.user_id === me.id || me.role === "admin") && (
-                    <button className="btn btn-ghost -mr-1.5 px-1 py-0.5" title="刪除備註" onClick={() => void remove(note)}>
+                    <button
+                      className="btn btn-ghost -mr-1.5 px-1 py-0.5"
+                      title="刪除備註"
+                      onClick={() => void remove(note)}
+                    >
                       <Trash2 className="size-3.5" />
                     </button>
                   )}
@@ -144,7 +195,10 @@ function Side({ detail }: { detail: FeedbackDetail }) {
           <div>
             <dt className="text-xs text-zinc-500 dark:text-zinc-400">網站</dt>
             <dd>
-              <Link className="text-brand-700 hover:underline dark:text-brand-300" to={`/sites/${detail.site_id}`}>
+              <Link
+                className="text-brand-700 hover:underline dark:text-brand-300"
+                to={`/sites/${detail.site_id}`}
+              >
                 {detail.site_name}
               </Link>
             </dd>
@@ -155,7 +209,9 @@ function Side({ detail }: { detail: FeedbackDetail }) {
           </div>
           {detail.page_url && (
             <div>
-              <dt className="text-xs text-zinc-500 dark:text-zinc-400">從哪一頁送出</dt>
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">
+                從哪一頁送出
+              </dt>
               <dd className="break-all">
                 {/^https?:\/\//.test(detail.page_url) ? (
                   <a
@@ -164,7 +220,8 @@ function Side({ detail }: { detail: FeedbackDetail }) {
                     target="_blank"
                     rel="noreferrer noopener"
                   >
-                    {detail.page_url} <ExternalLink className="mt-1 size-3 shrink-0" />
+                    {detail.page_url}{" "}
+                    <ExternalLink className="mt-1 size-3 shrink-0" />
                   </a>
                 ) : (
                   detail.page_url
@@ -180,8 +237,12 @@ function Side({ detail }: { detail: FeedbackDetail }) {
           )}
           {detail.user_agent && (
             <div>
-              <dt className="text-xs text-zinc-500 dark:text-zinc-400">瀏覽器</dt>
-              <dd className="text-xs break-words text-zinc-600 dark:text-zinc-400">{detail.user_agent}</dd>
+              <dt className="text-xs text-zinc-500 dark:text-zinc-400">
+                瀏覽器
+              </dt>
+              <dd className="text-xs break-words text-zinc-600 dark:text-zinc-400">
+                {detail.user_agent}
+              </dd>
             </div>
           )}
         </dl>
@@ -190,7 +251,9 @@ function Side({ detail }: { detail: FeedbackDetail }) {
       <section className="card p-4 text-sm">
         <h2 className="mb-3 text-sm font-semibold">通知</h2>
         {detail.deliveries.length === 0 ? (
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">這則訊息沒有送出通知。</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            這則訊息沒有送出通知。
+          </p>
         ) : (
           <ul className="flex flex-col gap-2.5">
             {detail.deliveries.map((d, i) => (
@@ -203,10 +266,18 @@ function Side({ detail }: { detail: FeedbackDetail }) {
                 <span className="min-w-0">
                   <span className="block">
                     {CHANNEL_LABEL[d.channel] ?? d.channel}
-                    <span className="ml-1.5 text-xs text-zinc-500 dark:text-zinc-400">{d.ok ? "已送出" : "失敗"}</span>
+                    <span className="ml-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {d.ok ? "已送出" : "失敗"}
+                    </span>
                   </span>
-                  <span className="block text-xs break-all text-zinc-500 dark:text-zinc-400">{d.target}</span>
-                  {!d.ok && d.detail && <span className="block text-xs break-words text-rose-600 dark:text-rose-400">{d.detail}</span>}
+                  <span className="block text-xs break-all text-zinc-500 dark:text-zinc-400">
+                    {d.target}
+                  </span>
+                  {!d.ok && d.detail && (
+                    <span className="block text-xs break-words text-rose-600 dark:text-rose-400">
+                      {d.detail}
+                    </span>
+                  )}
                 </span>
               </li>
             ))}
@@ -222,7 +293,10 @@ export function FeedbackDetailPage() {
   const me = useUser();
   const toast = useToast();
   const navigate = useNavigate();
-  const { data, setData, error, reload } = useAsync(() => api.feedbackDetail(id), [id]);
+  const { data, setData, error, reload } = useAsync(
+    () => api.feedbackDetail(id),
+    [id],
+  );
   const [busy, setBusy] = useState(false);
 
   const setStatus = async (status: Status) => {
@@ -238,7 +312,8 @@ export function FeedbackDetailPage() {
   };
 
   const remove = async () => {
-    if (!window.confirm("刪除這則訊息？備註和通知紀錄也會一起刪掉，不能復原。")) return;
+    if (!window.confirm("刪除這則訊息？備註和通知紀錄也會一起刪掉，不能復原。"))
+      return;
     try {
       await api.deleteFeedback(id);
       toast("訊息刪除了");
@@ -250,7 +325,10 @@ export function FeedbackDetailPage() {
 
   return (
     <PageBody>
-      <Link to="/inbox" className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white">
+      <Link
+        to="/inbox"
+        className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white"
+      >
         <ArrowLeft className="size-4" /> 收件匣
       </Link>
       {error && <ErrorBanner message={error} />}
@@ -258,7 +336,7 @@ export function FeedbackDetailPage() {
       {data && (
         <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
           <div className="flex min-w-0 flex-col gap-4">
-            <section className="card p-4 sm:p-5">
+            <section className="message-paper card p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight">
@@ -282,27 +360,42 @@ export function FeedbackDetailPage() {
                     ))}
                   </select>
                   {me.role === "admin" && (
-                    <button className="btn btn-ghost px-2 text-rose-600 dark:text-rose-400" title="刪除訊息" onClick={() => void remove()}>
+                    <button
+                      className="btn btn-ghost px-2 text-rose-600 dark:text-rose-400"
+                      title="刪除訊息"
+                      onClick={() => void remove()}
+                    >
                       <Trash2 className="size-4" />
                     </button>
                   )}
                 </div>
               </div>
               <p className="prose-message mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-                {data.message || <span className="text-zinc-500 dark:text-zinc-400">（沒有寫訊息）</span>}
+                {data.message || (
+                  <span className="text-zinc-500 dark:text-zinc-400">
+                    （沒有寫訊息）
+                  </span>
+                )}
               </p>
               {data.extra.length > 0 && (
                 <dl className="mt-4 grid gap-x-4 gap-y-2 rounded-xl bg-zinc-50 p-3 text-sm sm:grid-cols-[auto_1fr] dark:bg-zinc-800/60">
                   {data.extra.map((field) => (
                     <div key={field.name} className="contents">
-                      <dt className="font-mono text-xs leading-6 text-zinc-500 dark:text-zinc-400">{field.name}</dt>
-                      <dd className="break-words whitespace-pre-wrap">{field.value}</dd>
+                      <dt className="font-mono text-xs leading-6 text-zinc-500 dark:text-zinc-400">
+                        {field.name}
+                      </dt>
+                      <dd className="break-words whitespace-pre-wrap">
+                        {field.value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
               )}
             </section>
-            <Notes detail={data} onChange={(next) => (next ? setData(next) : void reload())} />
+            <Notes
+              detail={data}
+              onChange={(next) => (next ? setData(next) : void reload())}
+            />
           </div>
           <aside className="flex flex-col gap-4">
             <Side detail={data} />
