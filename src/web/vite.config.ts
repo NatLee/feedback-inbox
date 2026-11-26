@@ -9,9 +9,10 @@ const apiTarget = process.env.FI_API_URL ?? "http://127.0.0.1:8787";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    // Preserve the browser Host so the API same-origin guard accepts dev writes.
     proxy: {
-      "/api": apiTarget,
-      "/f": apiTarget,
+      "/api": { target: apiTarget, changeOrigin: false },
+      "^/f(?:/|$)": { target: apiTarget, changeOrigin: false },
     },
   },
   build: {
