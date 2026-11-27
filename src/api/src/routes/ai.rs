@@ -403,3 +403,16 @@ pub async fn auto_dry_run(
     tx.commit().await?;
     Ok(Json(result))
 }
+
+pub async fn jobs_list(
+    State(s): State<AppState>,
+    u: crate::auth::CurrentUser,
+    Path(id): Path<i64>,
+) -> AppResult<Json<Value>> {
+    use sqlx::Row;
+    super::sites::ensure_visible(&s, &u, id).await?;
+    let rows=sqlx::query("SELECT id,kind,state,attempt,error_code,created_at FROM workflow_jobs WHERE site_id=? ORDER BY id DESC LIMIT 100").bind(id).fetch_all(&s.db).await?;
+    Ok(Json(
+        json!({"items":rows.into_iter().map(|r|json!({"id":r.get::<i64,_>("id"),"kind":r.get::<String,_>("kind"),"state":r.get::<String,_>("state"),"attempt":r.get::<i64,_>("attempt"),"error_code":r.get::<Option<String>,_>("error_code"),"created_at":r.get::<String,_>("created_at")})).collect::<Vec<_>>()}),
+    ))
+}

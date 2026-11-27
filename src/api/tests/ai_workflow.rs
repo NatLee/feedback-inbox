@@ -297,3 +297,331 @@ async fn local_provider_analysis_redacts_fields_and_preserves_workflow_status() 
     assert!(!input.contains("identity"));
     server.abort();
 }
+
+#[tokio::test]
+async fn expired_claim_cannot_heartbeat_or_finish_and_running_analysis_has_global_bound() {
+    let app = TestApp::new().await;
+    let admin = app.admin().await;
+    let site = app.site(&admin, json!({"name":"Lease"})).await;
+    let site = site["id"].as_i64().unwrap();
+    let mut tx = app.state.db.begin().await.unwrap();
+    for i in 0..4 {
+        jobs::enqueue(&mut tx, site, "analysis", json!({}), &format!("lease-{i}"))
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let now = chrono::Utc::now().timestamp();
+    let first = jobs::claim(&app.state.db, now).await.unwrap().unwrap();
+    let _second = jobs::claim(&app.state.db, now).await.unwrap().unwrap();
+    assert!(
+        jobs::claim(&app.state.db, now).await.unwrap().is_none(),
+        "global analysis concurrency must be bounded across independent worker claims"
+    );
+    sqlx::query("UPDATE workflow_jobs SET lease_until=? WHERE id=?")
+        .bind(now - 1)
+        .bind(first.id)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    assert!(!jobs::heartbeat(&app.state.db, &first).await.unwrap());
+    assert!(
+        !jobs::finish(&app.state.db, &first, "succeeded", None, None)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn encryption_rotation_is_atomic_and_invalidates_provider_verification() {
+    use axum::http::Method;
+    use feedback_inbox::{
+        ai::secrets::{self, SecretStore},
+        config::EncryptionKey,
+    };
+    let app = TestApp::new().await;
+    let admin = app.admin().await;
+    let site = app.site(&admin, json!({"name":"Rotation"})).await;
+    let sid = site["id"].as_i64().unwrap();
+    let p = app.ok(&admin, Method::POST, "/api/ai/providers", json!({"name":"Credential fixture","kind":"ollama","base_url":"http://127.0.0.1:11434","model":"fixture","enabled":false,"credential":"rotation-fixture-secret"})).await;
+    let pid = p["id"].as_i64().unwrap();
+    let identity = app
+        .ok(
+            &admin,
+            Method::POST,
+            &format!("/api/sites/{sid}/identity-key/rotate"),
+            json!({}),
+        )
+        .await;
+    let before: String =
+        sqlx::query_scalar("SELECT credential_ciphertext FROM ai_providers WHERE id=?")
+            .bind(pid)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+    let identity_before: String =
+        sqlx::query_scalar("SELECT ciphertext FROM identity_keys WHERE site_id=?")
+            .bind(sid)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+    sqlx::query("UPDATE identity_keys SET ciphertext='corrupted fixture' WHERE site_id=?")
+        .bind(sid)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let next = EncryptionKey([9; 32]);
+    assert!(secrets::reencrypt(&app.state, &next).await.is_err());
+    assert_eq!(
+        sqlx::query_scalar::<_, String>(
+            "SELECT credential_ciphertext FROM ai_providers WHERE id=?"
+        )
+        .bind(pid)
+        .fetch_one(&app.state.db)
+        .await
+        .unwrap(),
+        before
+    );
+    sqlx::query("UPDATE identity_keys SET ciphertext=? WHERE site_id=?")
+        .bind(identity_before)
+        .bind(sid)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let mut tx = app.state.db.begin().await.unwrap();
+    let queued = jobs::enqueue(&mut tx, sid, "analysis", json!({}), "rotate-queued")
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let claim = jobs::claim(&app.state.db, chrono::Utc::now().timestamp())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        secrets::reencrypt(&app.state, &next).await.is_err(),
+        "active leases block offline rotation"
+    );
+    assert!(jobs::cancel(&app.state.db, claim.id).await.unwrap());
+    sqlx::query("UPDATE workflow_jobs SET state='queued' WHERE id=?")
+        .bind(queued)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    assert_eq!(secrets::reencrypt(&app.state, &next).await.unwrap(), 2);
+    let after: String =
+        sqlx::query_scalar("SELECT credential_ciphertext FROM ai_providers WHERE id=?")
+            .bind(pid)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+    assert!(secrets::for_state(&app.state)
+        .unwrap()
+        .decrypt("provider", pid, &after)
+        .is_err());
+    assert_eq!(
+        SecretStore::new(&next)
+            .decrypt("provider", pid, &after)
+            .unwrap(),
+        "rotation-fixture-secret"
+    );
+    let ciphertext: String =
+        sqlx::query_scalar("SELECT ciphertext FROM identity_keys WHERE site_id=?")
+            .bind(sid)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+    assert_eq!(
+        SecretStore::new(&next)
+            .decrypt("identity", sid, &ciphertext)
+            .unwrap(),
+        identity["secret"].as_str().unwrap()
+    );
+    let updated = app.get(&admin, "/api/ai/providers").await;
+    assert_eq!(updated["items"][0]["revision"], 2);
+    assert!(updated["items"][0]["tested_revision"].is_null());
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT state FROM workflow_jobs WHERE id=?")
+            .bind(queued)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap(),
+        "cancelled"
+    );
+}
+
+#[tokio::test]
+async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egress_and_results() {
+    use axum::{http::Method, routing::post, Json, Router};
+    use serde_json::Value;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
+    for inflight in [false, true] {
+        for mutation in ["authority", "policy", "source", "knowledge", "provider"] {
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            let calls = Arc::new(AtomicUsize::new(0));
+            let (seen, gate, count) = (entered.clone(), release.clone(), calls.clone());
+            let fixture = Router::new().route("/api/chat", post(move |Json(body):Json<Value>| {
+                let (seen, gate, count) = (seen.clone(), gate.clone(), count.clone());
+                async move {
+                    let input: Value = serde_json::from_str(body["messages"][1]["content"].as_str().unwrap()).unwrap();
+                    let output = if input.get("check").is_some() { json!({"ok":true}) } else {
+                        count.fetch_add(1, Ordering::SeqCst); seen.notify_one(); gate.notified().await;
+                        let f = &input["fields"][0]; let text = f["text"].as_str().unwrap();
+                        json!({"summary":"Fixture result","language":"en","category":input["categories"][0],"tags":[],"urgency":"normal","owner_id":null,"next_action":"Human review","missing_information":[],"risk_flags":[],"evidence":[{"field_id":f["field_id"],"start":0,"end":text.chars().count(),"quote":text}],"draft":{"subject":"Approved information","body":"Hours: weekdays.","knowledge_ids":[input["knowledge"][0]["id"]]}})
+                    };
+                    Json(json!({"done":true,"message":{"content":output.to_string()},"model":"fixture"}))
+                }
+            }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let origin = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move { axum::serve(listener, fixture).await.unwrap() });
+            let app = TestApp::with_workflow(
+                0,
+                feedback_inbox::config::WorkflowConfig {
+                    secret_key: Some(feedback_inbox::config::EncryptionKey([7; 32])),
+                    allowed_ollama_origins: vec![origin.clone()],
+                    ..Default::default()
+                },
+            )
+            .await;
+            let admin = app.admin().await;
+            let (uid, member) = app.member(&admin, "race-reviewer").await;
+            let site = app
+                .site(
+                    &admin,
+                    json!({"name":"Fencing","notify_email":false,"member_ids":[uid]}),
+                )
+                .await;
+            let sid = site["id"].as_i64().unwrap();
+            let provider = app.ok(&admin, Method::POST, "/api/ai/providers", json!({"name":"Fixture","kind":"ollama","base_url":origin,"model":"fixture","enabled":true})).await;
+            let pid = provider["id"].as_i64().unwrap();
+            app.ok(
+                &admin,
+                Method::POST,
+                &format!("/api/ai/providers/{pid}/test"),
+                json!({"expected_revision":1}),
+            )
+            .await;
+            let kp = format!("/api/sites/{sid}/ai/knowledge");
+            let k = app
+                .ok(
+                    &admin,
+                    Method::POST,
+                    &kp,
+                    json!({"title":"Hours","body":"Hours: weekdays."}),
+                )
+                .await;
+            let kid = k["id"].as_i64().unwrap();
+            app.ok(
+                &admin,
+                Method::POST,
+                &format!("{kp}/{kid}/approve"),
+                json!({"expected_revision":1}),
+            )
+            .await;
+            let context = app.get(&admin, &format!("/api/sites/{sid}/ai")).await;
+            let field = context["fields"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["key"] == "message")
+                .unwrap()["id"]
+                .clone();
+            let mut settings = context["settings"].clone();
+            settings["expected_revision"] = settings["revision"].clone();
+            settings["enabled"] = json!(true);
+            settings["provider_id"] = json!(pid);
+            settings["field_ids"] = json!([field]);
+            app.ok(
+                &admin,
+                Method::PUT,
+                &format!("/api/sites/{sid}/ai"),
+                settings,
+            )
+            .await;
+            app.submit(
+                site["key"].as_str().unwrap(),
+                json!({"name":"Visitor","email":"race@example.test","message":"😀 Hours please"}),
+            )
+            .await;
+            let fid: i64 = sqlx::query_scalar("SELECT MAX(id) FROM feedback")
+                .fetch_one(&app.state.db)
+                .await
+                .unwrap();
+            app.ok(
+                &member,
+                Method::POST,
+                &format!("/api/feedback/{fid}/ai/analyze"),
+                json!({}),
+            )
+            .await;
+            let state = app.state.clone();
+            let worker = if inflight {
+                let worker = tokio::spawn(async move { jobs::run_once(&state).await.unwrap() });
+                tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified())
+                    .await
+                    .unwrap();
+                Some(worker)
+            } else {
+                None
+            };
+            match mutation {
+                "authority" => {
+                    sqlx::query("DELETE FROM site_members WHERE site_id=? AND user_id=?")
+                        .bind(sid)
+                        .bind(uid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
+                "policy" => {
+                    sqlx::query("UPDATE site_ai_settings SET revision=revision+1 WHERE site_id=?")
+                        .bind(sid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
+                "source" => {
+                    sqlx::query("UPDATE feedback SET message='Changed source' WHERE id=?")
+                        .bind(fid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
+                "knowledge" => {
+                    sqlx::query("UPDATE ai_knowledge SET state='retired' WHERE id=?")
+                        .bind(kid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
+                "provider" => {
+                    sqlx::query("UPDATE ai_providers SET enabled=0,revision=revision+1 WHERE id=?")
+                        .bind(pid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
+                _ => unreachable!(),
+            }
+            if let Some(worker) = worker {
+                release.notify_one();
+                worker.await.unwrap();
+            } else {
+                assert!(jobs::run_once(&app.state).await.unwrap());
+            }
+            let result = app.get(&admin, &format!("/api/feedback/{fid}/ai")).await;
+            assert_eq!(
+                result["runs"][0]["state"], "superseded",
+                "phase={inflight}, mutation={mutation}: {result}"
+            );
+            assert!(result["proposal"].is_null() && result["draft"].is_null());
+            assert_eq!(result["outbound"], json!([]));
+            assert_eq!(calls.load(Ordering::SeqCst), usize::from(inflight));
+            server.abort();
+        }
+    }
+}

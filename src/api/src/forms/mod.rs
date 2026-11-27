@@ -153,6 +153,14 @@ pub async fn publish(
         return Err(AppError::conflict("草稿已更新，請重新載入"));
     }
     publish_schema(&mut tx, site_id, serde_json::from_str(&schema)?, user_id).await?;
+    sqlx::query(
+        "UPDATE form_drafts SET revision=revision+1,updated_by=?,updated_at=? WHERE site_id=?",
+    )
+    .bind(user_id)
+    .bind(db::now())
+    .bind(site_id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     load_version(pool, site_id, None).await
 }

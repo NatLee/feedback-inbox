@@ -81,6 +81,69 @@ fn unavailable() -> AppError {
         "密鑰無法解密，請檢查部署加密金鑰",
     )
 }
+/// Offline maintenance: replace only encryption envelopes in one transaction, never print secrets.
+pub async fn reencrypt(
+    state: &crate::state::AppState,
+    new_key: &EncryptionKey,
+) -> AppResult<usize> {
+    let old = for_state(state)?;
+    let new = SecretStore::new(new_key);
+    let mut tx = state.db.begin_with("BEGIN IMMEDIATE").await?;
+    let active: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_jobs WHERE state='running' AND lease_until>=?)",
+    )
+    .bind(chrono::Utc::now().timestamp())
+    .fetch_one(&mut *tx)
+    .await?;
+    if active {
+        return Err(AppError::conflict(
+            "仍有工作正在執行；請先停止服務並等待工作租約結束",
+        ));
+    }
+    let providers: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id,credential_ciphertext FROM ai_providers WHERE credential_ciphertext IS NOT NULL",
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    let identities: Vec<(i64, String)> =
+        sqlx::query_as("SELECT site_id,ciphertext FROM identity_keys")
+            .fetch_all(&mut *tx)
+            .await?;
+    let count = providers.len() + identities.len();
+    for (id, ciphertext) in providers {
+        let plaintext = old.decrypt("provider", id, &ciphertext)?;
+        let updated = new.encrypt("provider", id, &plaintext)?;
+        if new.decrypt("provider", id, &updated)? != plaintext {
+            return Err(unavailable());
+        }
+        sqlx::query("UPDATE ai_providers SET credential_ciphertext=?,revision=revision+1,tested_revision=NULL WHERE id=?").bind(updated).bind(id).execute(&mut *tx).await?;
+    }
+    for (id, ciphertext) in identities {
+        let plaintext = old.decrypt("identity", id, &ciphertext)?;
+        let updated = new.encrypt("identity", id, &plaintext)?;
+        sqlx::query("UPDATE identity_keys SET ciphertext=? WHERE site_id=?")
+            .bind(updated)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    sqlx::query("UPDATE workflow_jobs SET state='cancelled',token=NULL,lease_until=NULL WHERE state='queued' AND kind IN ('analysis','reply')").execute(&mut *tx).await?;
+    sqlx::query("UPDATE ai_runs SET state='superseded',error_code='encryption_key_rotated' WHERE state IN ('queued','running')").execute(&mut *tx).await?;
+    sqlx::query("UPDATE outbound_replies SET state='cancelled',error_code='encryption_key_rotated' WHERE state='queued'").execute(&mut *tx).await?;
+    crate::workflow_audit::record(
+        &mut tx,
+        None,
+        None,
+        "encryption_key",
+        0,
+        "rotated",
+        serde_json::json!({"credential_count":count}),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,10 @@
+import {cloneElement,useId,useState,type ReactElement,type ReactNode} from 'react';
+import {ErrorBanner,Spinner} from '../components/ui';
+import {errorText} from '../lib/hooks';
+export const STATE_LABEL:Record<string,string>={queued:'待執行',running:'分析中',succeeded:'分析完成',failed:'失敗',cancelled:'已取消',superseded:'已被取代',draft:'待審草稿',approved:'已核准',rejected:'已退回',pending:'待確認',accepted:'已採用',sending:'傳送中',sent:'SMTP 已接受',delivery_unknown:'寄送結果不明',retired:'已停用'};
+export function StateStamp({state}:{state:string}){return <span className={`ai-stamp ${['failed','delivery_unknown'].includes(state)?'ai-stamp-alert':''}`}>{STATE_LABEL[state]||state}</span>}
+export function AiSection({index,title,hint,children,action}:{index:string;title:string;hint?:string;children:ReactNode;action?:ReactNode}){return <section className="card ai-section"><header className="ai-section-heading"><div><span className="section-index">{index}</span><h2>{title}</h2>{hint&&<p>{hint}</p>}</div>{action}</header><div className="ai-section-body">{children}</div></section>}
+export function useAction(){const[busy,setBusy]=useState(false);const[error,setError]=useState<string|null>(null);const run=async(fn:()=>Promise<unknown>)=>{if(busy)return;setBusy(true);setError(null);try{await fn();}catch(e){setError(errorText(e));}finally{setBusy(false);}};return{busy,error,run,clear:()=>setError(null)}}
+export function ActionStatus({action}:{action:ReturnType<typeof useAction>}){return <>{action.error&&<ErrorBanner message={action.error}/>} {action.busy&&<span className="sr-only" role="status">正在處理</span>}</>}
+export function SaveButton({busy,children,disabled}:{busy:boolean;children:ReactNode;disabled?:boolean}){return <button className="btn btn-primary" disabled={busy||disabled}>{busy&&<Spinner/>}{children}</button>}
+export function Field({label,children,hint}:{label:string;children:ReactElement<{id?:string}>;hint?:string}){const id=useId();return <div><label className="label" htmlFor={id}>{label}</label>{cloneElement(children,{id})}{hint&&<p className="hint">{hint}</p>}</div>}

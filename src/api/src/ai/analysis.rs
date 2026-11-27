@@ -496,3 +496,41 @@ pub async fn execute(state: &AppState, claim: &jobs::Claim) -> AppResult<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn evidence_uses_unicode_scalars_and_drafts_require_known_approved_sources() {
+        let input = Input {
+            fields: vec![InputField {
+                field_id: "message".into(),
+                label: "Message".into(),
+                text: "😀營業時間".into(),
+            }],
+            categories: vec!["general".into()],
+            tags: vec![],
+            owner_ids: vec![7],
+            knowledge: vec![json!({"id":3,"title":"Hours","body":"Weekdays"})],
+        };
+        let valid = json!({"summary":"Hours question","language":"zh-TW","category":"general","tags":[],"urgency":"normal","owner_id":7,"next_action":"Review hours","missing_information":[],"risk_flags":[],"evidence":[{"field_id":"message","start":0,"end":2,"quote":"😀營"}],"draft":{"subject":"Hours","body":"Weekdays","knowledge_ids":[3]}});
+        assert!(validate(valid.clone(), &input).is_ok());
+        for (path, value) in [
+            ("/evidence/0/end", json!(3)),
+            ("/evidence/0/field_id", json!("secret")),
+            ("/evidence/0/quote", json!("invented")),
+            ("/draft/knowledge_ids", json!([99])),
+            ("/draft/knowledge_ids", json!([])),
+            (
+                "/draft/subject",
+                json!("Subject\r\nBcc: injected@example.test"),
+            ),
+            ("/category", json!("unknown")),
+            ("/owner_id", json!(99)),
+        ] {
+            let mut invalid = valid.clone();
+            *invalid.pointer_mut(path).unwrap() = value;
+            assert!(validate(invalid, &input).is_err(), "must reject {path}");
+        }
+    }
+}

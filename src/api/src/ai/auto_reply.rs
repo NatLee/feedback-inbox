@@ -243,6 +243,13 @@ pub async fn evaluate(
     if previous {
         return Ok(review("previous_reply", "此訊息已有回覆紀錄，請人工確認"));
     }
+    let manual_review:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM reply_drafts WHERE feedback_id=? AND (origin='human' OR state='rejected'))").bind(feedback).fetch_one(&mut *tx).await?;
+    if manual_review {
+        return Ok(review(
+            "human_review_in_progress",
+            "這封來信已有人工撰寫或退回的草稿，請完成原本的人工審核",
+        ));
+    }
     let run: Option<analysis::Run> = sqlx::query_as(
         "SELECT * FROM ai_runs WHERE feedback_id=? AND state='succeeded' ORDER BY id DESC LIMIT 1",
     )
@@ -452,6 +459,7 @@ pub async fn reserve(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    sqlx::query("UPDATE reply_drafts SET state='superseded' WHERE feedback_id=? AND origin='ai' AND state='draft'").bind(feedback).execute(&mut *tx).await?;
     workflow_audit::record(tx,Some(e.site),Some(e.actor),"outbound",id,"auto_reserved",json!({"rule_id":e.rule,"template_id":e.template,"policy_revision":e.policy_revision,"content_hash":hash})).await?;
     Ok(())
 }

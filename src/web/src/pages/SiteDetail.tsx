@@ -1,3 +1,4 @@
+import {SiteAi} from "../ai/SiteAi";
 import { FormBuilder } from "../forms/FormBuilder";
 import { Integrations } from "../forms/Integrations";
 import { ArrowLeft, BellRing, CheckCircle2, Inbox, Trash2, XCircle } from "lucide-react";
@@ -327,7 +328,7 @@ function Summary({ site }: { site: Site }) {
 
 export function SiteDetailPage() {
   const id = Number(useParams().id);
-  const [tab,setTab]=useState<"form"|"integrations"|"settings">("form");
+  const [tab,setTab]=useState<"form"|"integrations"|"ai"|"settings">("form");
   const admin = useUser().role === "admin";
   const { data: site, setData, error } = useAsync(() => api.site(id), [id]);
   // 只有管理員拿得到帳號清單
@@ -356,9 +357,10 @@ export function SiteDetailPage() {
             }
           />
           <div className="flex flex-col gap-4">
-            <nav className="flex flex-wrap gap-2" aria-label="網站設定分頁">{([['form','表單'],['integrations','發布與嵌入'],['settings','通知與負責人']] as const).map(([key,label])=><button key={key} className={`btn ${tab===key?'btn-primary':'btn-secondary'}`} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
+            <nav className="flex flex-wrap gap-2" aria-label="網站設定分頁">{([['form','表單'],['integrations','發布與嵌入'],['ai','AI 與回覆'],['settings','通知與負責人']] as const).map(([key,label])=><button key={key} className={`btn ${tab===key?'btn-primary':'btn-secondary'}`} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
             {tab==='form' && <FormBuilder siteId={site.id} admin={admin}/>}
             {tab==='integrations' && <Integrations site={site} admin={admin} onChanged={setData}/>}
+            {tab==='ai' && <SiteAi siteId={site.id} admin={admin}/>}
             {tab==='settings' && (admin ? accounts.data && <SettingsForm key={site.id} site={site} accounts={accounts.data} onSaved={setData}/> : <Summary site={site}/>)}
           </div>
         </>

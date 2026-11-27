@@ -154,7 +154,7 @@ async fn exact_approval_is_idempotent_and_smtp_ambiguity_is_never_retried() {
     }
 }
 #[tokio::test]
-async fn revoking_reviewer_or_editing_draft_cancels_before_transmission() {
+async fn revoking_reviewer_cancels_before_transmission() {
     let (smtp, messages, server) = smtp_fixture(false).await;
     let app = TestApp::with_smtp(0, Default::default(), Some(smtp)).await;
     let admin = app.admin().await;
@@ -340,6 +340,157 @@ async fn controlled_auto_template_sends_only_verified_consented_future_feedback(
         }
     }
     assert_eq!(messages.lock().unwrap().len(), 1);
+    // Pausing wins atomically after analysis reserves a reply but before SMTP begins.
+    let body = json!({"_form_version":version,"name":"Visitor","email":"second@example.test","message":"Hello","request_type":"general","reply_requested":true,"_identity_token":token("second@example.test","unique-identity-pause")});
+    assert_eq!(app.submit(key, body).await.0, StatusCode::OK);
+    let paused_id: i64 = sqlx::query_scalar("SELECT MAX(id) FROM feedback")
+        .fetch_one(&app.state.db)
+        .await
+        .unwrap();
+    assert!(feedback_inbox::jobs::run_once(&app.state).await.unwrap());
+    assert_eq!(
+        app.get(&admin, &format!("/api/feedback/{paused_id}/ai"))
+            .await["outbound"][0]["state"],
+        "queued"
+    );
+    let context = app.get(&admin, &format!("/api/sites/{sid}/ai")).await;
+    let mut policy = context["settings"].clone();
+    policy["expected_revision"] = policy["revision"].clone();
+    policy["auto_mode"] = json!("off");
+    app.ok(&admin, Method::PUT, &format!("/api/sites/{sid}/ai"), policy)
+        .await;
+    while feedback_inbox::jobs::run_once(&app.state).await.unwrap() {}
+    assert_eq!(
+        app.get(&admin, &format!("/api/feedback/{paused_id}/ai"))
+            .await["outbound"][0]["state"],
+        "cancelled"
+    );
+    assert_eq!(messages.lock().unwrap().len(), 1);
+    // Resuming takes a new high-water mark, so it cannot resurrect paused historical work.
+    let context = app.get(&admin, &format!("/api/sites/{sid}/ai")).await;
+    let mut policy = context["settings"].clone();
+    policy["expected_revision"] = policy["revision"].clone();
+    policy["auto_mode"] = json!("auto_template");
+    app.ok(&admin, Method::PUT, &format!("/api/sites/{sid}/ai"), policy)
+        .await;
+    assert_eq!(
+        app.ok(
+            &admin,
+            Method::POST,
+            &format!("/api/sites/{sid}/ai/auto/dry-run"),
+            json!({"feedback_id":paused_id})
+        )
+        .await["gate"],
+        "before_activation"
+    );
+    // A template retirement cancels a newly reserved reply before delivery.
+    let body = json!({"_form_version":version,"name":"Visitor","email":"third@example.test","message":"Hello","request_type":"general","reply_requested":true,"_identity_token":token("third@example.test","unique-identity-retire")});
+    assert_eq!(app.submit(key, body).await.0, StatusCode::OK);
+    let retired_id: i64 = sqlx::query_scalar("SELECT MAX(id) FROM feedback")
+        .fetch_one(&app.state.db)
+        .await
+        .unwrap();
+    assert!(feedback_inbox::jobs::run_once(&app.state).await.unwrap());
+    assert_eq!(
+        app.get(&admin, &format!("/api/feedback/{retired_id}/ai"))
+            .await["outbound"][0]["state"],
+        "queued"
+    );
+    app.ok(
+        &admin,
+        Method::POST,
+        &format!("{tpl_path}/{tid}/retire"),
+        json!({"expected_revision":1}),
+    )
+    .await;
+    while feedback_inbox::jobs::run_once(&app.state).await.unwrap() {}
+    assert_eq!(
+        app.get(&admin, &format!("/api/feedback/{retired_id}/ai"))
+            .await["outbound"][0]["state"],
+        "cancelled"
+    );
+    assert_eq!(messages.lock().unwrap().len(), 1);
     smtp_server.abort();
     provider_server.abort();
+}
+
+#[tokio::test]
+async fn lost_reply_claim_retries_only_before_the_transmission_boundary() {
+    for transmission_started in [false, true] {
+        let (smtp, messages, server) = smtp_fixture(false).await;
+        let app = TestApp::with_smtp(0, Default::default(), Some(smtp)).await;
+        let admin = app.admin().await;
+        let site = app
+            .site(&admin, json!({"name":"Recovery","notify_email":false}))
+            .await;
+        app.submit(
+            site["key"].as_str().unwrap(),
+            json!({"name":"Visitor","email":"recovery@example.test","message":"Recover safely"}),
+        )
+        .await;
+        let fid: i64 = sqlx::query_scalar("SELECT MAX(id) FROM feedback")
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+        let draft = app.ok(&admin, Method::POST, &format!("/api/feedback/{fid}/ai/draft"), json!({"recipient":"recovery@example.test","subject":"Reviewed","body":"Reviewed recovery reply","knowledge_ids":[]})).await;
+        let outbound = app.ok(&admin, Method::POST, &format!("/api/feedback/{fid}/ai/send"), json!({"expected_revision":1,"content_hash":draft["content_hash"],"idempotency_key":"recovery-send-0001"})).await;
+        let now = chrono::Utc::now().timestamp();
+        let claim = feedback_inbox::jobs::claim(&app.state.db, now)
+            .await
+            .unwrap()
+            .unwrap();
+        if transmission_started {
+            sqlx::query("UPDATE outbound_replies SET state='sending' WHERE id=?")
+                .bind(outbound["id"].as_i64().unwrap())
+                .execute(&app.state.db)
+                .await
+                .unwrap();
+        }
+        sqlx::query("UPDATE workflow_jobs SET lease_until=? WHERE id=?")
+            .bind(now - 1)
+            .bind(claim.id)
+            .execute(&app.state.db)
+            .await
+            .unwrap();
+        assert!(feedback_inbox::jobs::claim(&app.state.db, now)
+            .await
+            .unwrap()
+            .is_none());
+        let state = app.get(&admin, &format!("/api/feedback/{fid}/ai")).await;
+        assert_eq!(
+            state["outbound"][0]["state"],
+            if transmission_started {
+                "delivery_unknown"
+            } else {
+                "queued"
+            }
+        );
+        let job_state: String = sqlx::query_scalar("SELECT state FROM workflow_jobs WHERE id=?")
+            .bind(claim.id)
+            .fetch_one(&app.state.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            job_state,
+            if transmission_started {
+                "delivery_unknown"
+            } else {
+                "queued"
+            }
+        );
+        sqlx::query("UPDATE workflow_jobs SET available_at=0 WHERE id=?")
+            .bind(claim.id)
+            .execute(&app.state.db)
+            .await
+            .unwrap();
+        while feedback_inbox::jobs::run_once(&app.state).await.unwrap() {}
+        assert_eq!(
+            messages.lock().unwrap().len(),
+            if transmission_started { 0 } else { 1 }
+        );
+        assert!(!feedback_inbox::jobs::heartbeat(&app.state.db, &claim)
+            .await
+            .unwrap());
+        server.abort();
+    }
 }

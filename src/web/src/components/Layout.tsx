@@ -1,5 +1,6 @@
 import {
   Globe,
+  FileCheck2,
   KeyRound,
   Inbox,
   LayoutDashboard,
@@ -28,6 +29,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: "/", label: "總覽", icon: LayoutDashboard, end: true },
   { to: "/inbox", label: "收件匣", icon: Inbox },
+  { to: "/review", label: "待審回信", icon: FileCheck2 },
   { to: "/sites", label: "網站", icon: Globe },
   { to: "/connections", label: "連線與存取", icon: KeyRound },
   { to: "/settings", label: "設定", icon: Settings },

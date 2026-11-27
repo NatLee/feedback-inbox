@@ -414,6 +414,20 @@ pub async fn reconcile(
         .bind(id)
         .execute(&mut *tx)
         .await?;
+    sqlx::query(
+        "INSERT INTO notes(feedback_id,user_id,kind,body,created_at) VALUES(?,?,'note',?,?)",
+    )
+    .bind(o.feedback_id)
+    .bind(actor)
+    .bind(format!(
+        "寄送 #{} 人工查證（{}）：{}",
+        id,
+        b.resolution,
+        b.note.trim()
+    ))
+    .bind(db::now())
+    .execute(&mut *tx)
+    .await?;
     // Keep arbitrary operator text out of audit metadata. Its digest proves which statement was acknowledged.
     workflow_audit::record(
         &mut tx,

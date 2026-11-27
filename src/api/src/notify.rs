@@ -400,84 +400,6 @@ pub async fn send(state: &AppState, targets: &Targets, notice: &Notice) -> Vec<O
     outcomes
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn notice() -> Notice {
-        Notice {
-            site_name: "官方網站".into(),
-            feedback_id: 7,
-            name: "王小明".into(),
-            email: "ming@example.com".into(),
-            phone: String::new(),
-            company: "範例科技".into(),
-            message: "想了解 <b>企業方案</b>\n謝謝".into(),
-            extra: vec![Extra {
-                name: "預算".into(),
-                value: "10 萬 & 以上".into(),
-            }],
-            created_at: "2026-01-05T08:00:00Z".into(),
-            link: Some("https://inbox.example.com/inbox/7".into()),
-        }
-    }
-
-    #[test]
-    fn subject_is_one_line() {
-        assert_eq!(subject(&notice()), "[官方網站] 王小明（範例科技） 的新訊息");
-        let mut n = notice();
-        n.name = "x\r\nBcc: someone@example.com".into();
-        n.company.clear();
-        assert!(!subject(&n).contains('\n') && !subject(&n).contains('\r'));
-        n.name.clear();
-        assert_eq!(subject(&n), "[官方網站] 訪客 的新訊息");
-    }
-
-    #[test]
-    fn bodies_skip_empty_fields_and_escape_html() {
-        let text = text_body(&notice());
-        assert!(text.contains("姓名：王小明") && text.contains("預算：10 萬 & 以上"));
-        assert!(!text.contains("電話"));
-        assert!(text.contains("https://inbox.example.com/inbox/7"));
-
-        let html = html_body(&notice());
-        assert!(html.contains("想了解 &lt;b&gt;企業方案&lt;/b&gt;"));
-        assert!(html.contains("10 萬 &amp; 以上"));
-        assert!(!html.contains("<b>"));
-    }
-
-    #[test]
-    fn webhook_format_follows_the_url() {
-        let n = notice();
-        let discord = webhook_payload("https://discord.com/api/webhooks/1/abc", &n);
-        assert_eq!(discord["embeds"][0]["title"], "王小明（範例科技） 的新訊息");
-        assert_eq!(discord["allowed_mentions"]["parse"], json!([]));
-
-        let slack = webhook_payload("https://hooks.slack.com/services/T/B/x", &n);
-        assert!(slack["text"]
-            .as_str()
-            .unwrap()
-            .contains("預算：10 萬 & 以上"));
-
-        let generic = webhook_payload("https://example.com/hook", &n);
-        assert_eq!(generic["event"], "feedback.created");
-        assert_eq!(generic["feedback"]["extra"][0]["name"], "預算");
-
-        // 長得像但不是 Discord 的網址用一般格式
-        let fake = webhook_payload("https://discord.com.evil.example/api/webhooks/1/abc", &n);
-        assert_eq!(fake["event"], "feedback.created");
-    }
-
-    #[test]
-    fn webhook_urls_are_masked() {
-        assert_eq!(
-            mask_url("https://discord.com/api/webhooks/1/secret-token"),
-            "https://discord.com/…"
-        );
-        assert_eq!(mask_url("nonsense"), "…");
-    }
-}
-
 /// Snapshot one durable task per destination inside the intake transaction.
 pub async fn enqueue(
     tx: &mut sqlx::SqliteConnection,
@@ -643,5 +565,83 @@ impl Mailer {
             Ok(Err(e)) if e.is_transient() => ReplyOutcome::RejectedTransient,
             _ => ReplyOutcome::Unknown,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn notice() -> Notice {
+        Notice {
+            site_name: "官方網站".into(),
+            feedback_id: 7,
+            name: "王小明".into(),
+            email: "ming@example.com".into(),
+            phone: String::new(),
+            company: "範例科技".into(),
+            message: "想了解 <b>企業方案</b>\n謝謝".into(),
+            extra: vec![Extra {
+                name: "預算".into(),
+                value: "10 萬 & 以上".into(),
+            }],
+            created_at: "2026-01-05T08:00:00Z".into(),
+            link: Some("https://inbox.example.com/inbox/7".into()),
+        }
+    }
+
+    #[test]
+    fn subject_is_one_line() {
+        assert_eq!(subject(&notice()), "[官方網站] 王小明（範例科技） 的新訊息");
+        let mut n = notice();
+        n.name = "x\r\nBcc: someone@example.com".into();
+        n.company.clear();
+        assert!(!subject(&n).contains('\n') && !subject(&n).contains('\r'));
+        n.name.clear();
+        assert_eq!(subject(&n), "[官方網站] 訪客 的新訊息");
+    }
+
+    #[test]
+    fn bodies_skip_empty_fields_and_escape_html() {
+        let text = text_body(&notice());
+        assert!(text.contains("姓名：王小明") && text.contains("預算：10 萬 & 以上"));
+        assert!(!text.contains("電話"));
+        assert!(text.contains("https://inbox.example.com/inbox/7"));
+
+        let html = html_body(&notice());
+        assert!(html.contains("想了解 &lt;b&gt;企業方案&lt;/b&gt;"));
+        assert!(html.contains("10 萬 &amp; 以上"));
+        assert!(!html.contains("<b>"));
+    }
+
+    #[test]
+    fn webhook_format_follows_the_url() {
+        let n = notice();
+        let discord = webhook_payload("https://discord.com/api/webhooks/1/abc", &n);
+        assert_eq!(discord["embeds"][0]["title"], "王小明（範例科技） 的新訊息");
+        assert_eq!(discord["allowed_mentions"]["parse"], json!([]));
+
+        let slack = webhook_payload("https://hooks.slack.com/services/T/B/x", &n);
+        assert!(slack["text"]
+            .as_str()
+            .unwrap()
+            .contains("預算：10 萬 & 以上"));
+
+        let generic = webhook_payload("https://example.com/hook", &n);
+        assert_eq!(generic["event"], "feedback.created");
+        assert_eq!(generic["feedback"]["extra"][0]["name"], "預算");
+
+        // 長得像但不是 Discord 的網址用一般格式
+        let fake = webhook_payload("https://discord.com.evil.example/api/webhooks/1/abc", &n);
+        assert_eq!(fake["event"], "feedback.created");
+    }
+
+    #[test]
+    fn webhook_urls_are_masked() {
+        assert_eq!(
+            mask_url("https://discord.com/api/webhooks/1/secret-token"),
+            "https://discord.com/…"
+        );
+        assert_eq!(mask_url("nonsense"), "…");
     }
 }

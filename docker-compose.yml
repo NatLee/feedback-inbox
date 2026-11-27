@@ -25,6 +25,11 @@ services:
       FI_TRUST_PROXY: ${FI_TRUST_PROXY:-true}
       # 同一個 IP 一分鐘最多送幾次表單（預設 10，0 是不限制）
       FI_RATE_LIMIT: ${FI_RATE_LIMIT:-}
+      # Optional AI / trusted identity; no provider runs until an admin enables a site.
+      FI_AI_SECRET_KEY: ${FI_AI_SECRET_KEY:-}
+      FI_AI_ALLOWED_OLLAMA_ORIGINS: ${FI_AI_ALLOWED_OLLAMA_ORIGINS:-http://127.0.0.1:11434}
+      FI_AI_CONCURRENCY: ${FI_AI_CONCURRENCY:-2}
+      FI_AI_AUTO_SEND_ENABLED: ${FI_AI_AUTO_SEND_ENABLED:-false}
       # 寄通知信用的 SMTP；沒設 FI_SMTP_HOST 就不寄信，webhook 不受影響
       FI_SMTP_HOST: ${FI_SMTP_HOST:-}
       FI_SMTP_PORT: ${FI_SMTP_PORT:-}

@@ -44,6 +44,18 @@ async fn publish_is_immutable_and_revision_checked() {
         )
         .await;
     assert_eq!(published["version"], 2);
+    assert_eq!(
+        t.call(
+            Some(&admin),
+            Method::POST,
+            &format!("{route}/publish"),
+            Some(json!({"expected_revision":2}))
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT,
+        "the same optimistic revision cannot publish twice"
+    );
     let (status, _) = t
         .call(
             Some(&admin),

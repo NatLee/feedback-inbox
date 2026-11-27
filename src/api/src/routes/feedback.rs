@@ -52,6 +52,10 @@ struct Row {
     identity_json: String,
     submission_mode: String,
     is_test: bool,
+    category: String,
+    tags_json: String,
+    urgency: String,
+    owner_id: Option<i64>,
     status: String,
     ip: String,
     user_agent: String,
@@ -62,7 +66,7 @@ struct Row {
 }
 
 const SELECT: &str = "SELECT f.id, f.site_id, s.name AS site_name, f.name, f.email, f.phone,
-        f.company, f.message, f.extra, f.form_version_id, f.answers_json, f.identity_json, f.submission_mode, f.is_test, f.status, f.ip, f.user_agent, f.page_url,
+        f.company, f.message, f.extra, f.form_version_id, f.answers_json, f.identity_json, f.submission_mode, f.is_test, f.category, f.tags_json, f.urgency, f.owner_id, f.status, f.ip, f.user_agent, f.page_url,
         f.created_at, f.updated_at,
         (SELECT COUNT(*) FROM notes n WHERE n.feedback_id = f.id AND n.kind = 'note') AS note_count
      FROM feedback f JOIN sites s ON s.id = f.site_id";
@@ -80,6 +84,10 @@ pub struct Item {
     preview: String,
     status: String,
     is_test: bool,
+    category: String,
+    tags: Value,
+    urgency: String,
+    owner_id: Option<i64>,
     created_at: String,
     note_count: i64,
 }
@@ -96,6 +104,10 @@ fn item(row: Row) -> Item {
         preview: truncate(&one_line, 120),
         status: row.status,
         is_test: row.is_test,
+        category: row.category,
+        tags: serde_json::from_str(&row.tags_json).unwrap_or(json!([])),
+        urgency: row.urgency,
+        owner_id: row.owner_id,
         created_at: row.created_at,
         note_count: row.note_count,
     }
@@ -117,6 +129,9 @@ pub struct Filter {
     /// 匯出時把時間換成當地時間用：比 UTC 快幾分鐘（台北是 480）
     tz_offset: Option<i32>,
     test_only: Option<bool>,
+    category: Option<String>,
+    urgency: Option<String>,
+    review_only: Option<bool>,
 }
 
 /// Received-age buckets, shared by the triage counts and list/export filters.
@@ -190,6 +205,21 @@ fn push_filters(
     qb.push(" WHERE f.is_test = ")
         .push_bind(filter.test_only.unwrap_or(false));
     push_visible(qb, user);
+    if let Some(category) = &filter.category {
+        if category.chars().count() > 60 {
+            return Err(AppError::bad("分類長度超過限制"));
+        }
+        qb.push(" AND f.category = ").push_bind(category.clone());
+    }
+    if let Some(urgency) = &filter.urgency {
+        if !["low", "normal", "high"].contains(&urgency.as_str()) {
+            return Err(AppError::bad("優先程度格式不符"));
+        }
+        qb.push(" AND f.urgency = ").push_bind(urgency.clone());
+    }
+    if filter.review_only == Some(true) {
+        qb.push(" AND EXISTS(SELECT 1 FROM reply_drafts d WHERE d.feedback_id=f.id AND d.state='draft' AND d.revision=(SELECT MAX(revision) FROM reply_drafts WHERE feedback_id=f.id))");
+    }
     if let Some(site_id) = filter.site_id {
         qb.push(" AND f.site_id = ").push_bind(site_id);
     }
@@ -353,6 +383,7 @@ async fn present(state: &AppState, row: Row) -> AppResult<Value> {
         "form":form,"answers":serde_json::from_str::<Value>(&row.answers_json).unwrap_or(json!({})),
         "identity":serde_json::from_str::<Value>(&row.identity_json).unwrap_or(json!({})),"is_test":row.is_test,"submission_mode":row.submission_mode,
         "status": row.status,
+        "category":row.category,"tags":serde_json::from_str::<Value>(&row.tags_json).unwrap_or(json!([])),"urgency":row.urgency,"owner_id":row.owner_id,
         "ip": row.ip,
         "user_agent": row.user_agent,
         "page_url": row.page_url,

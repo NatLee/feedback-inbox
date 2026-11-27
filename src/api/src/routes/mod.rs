@@ -74,6 +74,7 @@ fn api_routes() -> Router<AppState> {
             axum::routing::put(ai::rule_update).delete(ai::rule_remove),
         )
         .route("/sites/{id}/ai/auto/dry-run", post(ai::auto_dry_run))
+        .route("/sites/{id}/ai/jobs", get(ai::jobs_list))
         .route("/health", get(|| async { "ok" }))
         .route("/meta", get(meta))
         .route("/auth/state", get(auth::state))

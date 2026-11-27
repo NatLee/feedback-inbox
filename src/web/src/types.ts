@@ -94,6 +94,11 @@ export interface TestResult {
 }
 
 export interface FeedbackItem {
+  is_test?:boolean;
+  category?:string;
+  tags?:string[];
+  urgency?:string;
+  owner_id?:number|null;
   id: number;
   site_id: number;
   site_name: string;
@@ -120,6 +125,10 @@ export type StatusFilter = Status | "open" | "all";
 export type FeedbackAge = "fresh" | "waiting" | "overdue";
 
 export interface FeedbackFilter {
+  test_only?:boolean;
+  category?:string;
+  urgency?:string;
+  review_only?:boolean;
   age?: FeedbackAge;
   sort?: "newest" | "oldest";
   site_id?: number;
@@ -146,6 +155,15 @@ export interface Delivery extends Outcome {
 }
 
 export interface FeedbackDetail {
+  form?: {version:number;schema:import('./forms/types').FormSchema}|null;
+  answers?: Record<string,string|number|boolean|null>;
+  identity?: {subject?:string;email?:string;email_verified?:boolean;verified_at?:number};
+  is_test?:boolean;
+  submission_mode?:string;
+  category?:string;
+  tags?:string[];
+  urgency?:string;
+  owner_id?:number|null;
   id: number;
   site_id: number;
   site_name: string;

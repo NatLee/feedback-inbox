@@ -33,14 +33,25 @@ pub async fn enqueue(
     )
 }
 pub async fn claim(db: &SqlitePool, now: i64) -> AppResult<Option<Claim>> {
+    claim_with_limit(db, now, 2).await
+}
+async fn claim_with_limit(
+    db: &SqlitePool,
+    now: i64,
+    concurrency: usize,
+) -> AppResult<Option<Claim>> {
     let mut tx = db.begin_with("BEGIN IMMEDIATE").await?;
     // SMTP may already have accepted the message. Never reclaim an ambiguous send.
     sqlx::query("UPDATE outbound_replies SET state='delivery_unknown',error_code='worker_lost' WHERE state='sending' AND job_id IN (SELECT id FROM workflow_jobs WHERE state='running' AND lease_until<?)").bind(now).execute(&mut *tx).await?;
-    sqlx::query("UPDATE workflow_jobs SET state=CASE WHEN kind IN ('reply','notify_email','notify_webhook') THEN 'delivery_unknown' WHEN attempt>=3 THEN 'failed' ELSE 'queued' END, token=NULL, lease_until=NULL, available_at=? WHERE state='running' AND lease_until<?").bind(now+5).bind(now).execute(&mut *tx).await?;
+    // A worker that never crossed queued -> sending has not contacted SMTP and is safe to retry.
+    sqlx::query("UPDATE outbound_replies SET state='failed',error_code='worker_lease_expired' WHERE state='queued' AND job_id IN (SELECT id FROM workflow_jobs WHERE kind='reply' AND state='running' AND lease_until<? AND attempt>=3)").bind(now).execute(&mut *tx).await?;
+    sqlx::query("UPDATE ai_runs SET state=CASE WHEN (SELECT attempt FROM workflow_jobs WHERE id=ai_runs.job_id)>=3 THEN 'failed' ELSE 'queued' END,error_code='worker_lease_expired',error_message='工作租約到期，系統將依重試上限處理' WHERE state='running' AND job_id IN (SELECT id FROM workflow_jobs WHERE kind='analysis' AND state='running' AND lease_until<?)").bind(now).execute(&mut *tx).await?;
+    sqlx::query("UPDATE workflow_jobs SET state=CASE WHEN kind='reply' AND EXISTS(SELECT 1 FROM outbound_replies o WHERE o.job_id=workflow_jobs.id AND o.state='queued') THEN 'queued' WHEN kind='reply' AND EXISTS(SELECT 1 FROM outbound_replies o WHERE o.job_id=workflow_jobs.id AND o.state='failed') THEN 'failed' WHEN kind IN ('reply','notify_email','notify_webhook') THEN 'delivery_unknown' WHEN attempt>=3 THEN 'failed' ELSE 'queued' END, token=NULL, lease_until=NULL, available_at=? WHERE state='running' AND lease_until<?").bind(now+5).bind(now).execute(&mut *tx).await?;
     let id: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM workflow_jobs WHERE state='queued' AND available_at<=? ORDER BY id LIMIT 1",
+        "SELECT id FROM workflow_jobs WHERE state='queued' AND available_at<=? AND (kind!='analysis' OR (SELECT COUNT(*) FROM workflow_jobs WHERE kind='analysis' AND state='running')<?) ORDER BY id LIMIT 1",
     )
     .bind(now)
+    .bind(concurrency.clamp(1,8) as i64)
     .fetch_optional(&mut *tx)
     .await?;
     let Some(id) = id else {
@@ -73,7 +84,7 @@ pub async fn finish(
     retry_after: Option<i64>,
 ) -> AppResult<bool> {
     let retry = retry_after.filter(|_| claim.attempt < 3);
-    let result=sqlx::query("UPDATE workflow_jobs SET state=?,error_code=?,available_at=?,token=NULL,lease_until=NULL WHERE id=? AND state='running' AND token=?").bind(if retry.is_some(){"queued"}else{state}).bind(error).bind(chrono::Utc::now().timestamp()+retry.unwrap_or(0).clamp(0,300)).bind(claim.id).bind(&claim.token).execute(db).await?;
+    let result=sqlx::query("UPDATE workflow_jobs SET state=?,error_code=?,available_at=?,token=NULL,lease_until=NULL WHERE id=? AND state='running' AND token=? AND lease_until>=?").bind(if retry.is_some(){"queued"}else{state}).bind(error).bind(chrono::Utc::now().timestamp()+retry.unwrap_or(0).clamp(0,300)).bind(claim.id).bind(&claim.token).bind(chrono::Utc::now().timestamp()).execute(db).await?;
     Ok(result.rows_affected() == 1)
 }
 pub async fn cancel(db: &SqlitePool, id: i64) -> AppResult<bool> {
@@ -82,11 +93,12 @@ pub async fn cancel(db: &SqlitePool, id: i64) -> AppResult<bool> {
 }
 pub async fn heartbeat(db: &SqlitePool, claim: &Claim) -> AppResult<bool> {
     Ok(sqlx::query(
-        "UPDATE workflow_jobs SET lease_until=? WHERE id=? AND state='running' AND token=?",
+        "UPDATE workflow_jobs SET lease_until=? WHERE id=? AND state='running' AND token=? AND lease_until>=?",
     )
     .bind(chrono::Utc::now().timestamp() + 180)
     .bind(claim.id)
     .bind(&claim.token)
+    .bind(chrono::Utc::now().timestamp())
     .execute(db)
     .await?
     .rows_affected()
@@ -112,7 +124,13 @@ pub async fn cleanup(db: &SqlitePool) -> AppResult<()> {
     Ok(())
 }
 pub async fn run_once(state: &AppState) -> AppResult<bool> {
-    let Some(claim) = claim(&state.db, chrono::Utc::now().timestamp()).await? else {
+    let Some(claim) = claim_with_limit(
+        &state.db,
+        chrono::Utc::now().timestamp(),
+        state.config.workflow.concurrency,
+    )
+    .await?
+    else {
         return Ok(false);
     };
     let execute = async {
@@ -131,7 +149,7 @@ pub async fn run_once(state: &AppState) -> AppResult<bool> {
     };
     if let Err(error) = result {
         let (_, _, code) = error.public_parts();
-        finish(
+        let finished = finish(
             &state.db,
             &claim,
             "failed",
@@ -139,6 +157,9 @@ pub async fn run_once(state: &AppState) -> AppResult<bool> {
             None,
         )
         .await?;
+        if finished && claim.kind == "analysis" {
+            sqlx::query("UPDATE ai_runs SET state='failed',error_code='job_failed',error_message='工作未完成，請檢查設定後重新執行' WHERE job_id=? AND state IN ('queued','running')").bind(claim.id).execute(&state.db).await?;
+        }
     }
     Ok(true)
 }
