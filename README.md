@@ -38,7 +38,7 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 ![客戶回覆與 SMTP 接受紀錄（本機模型與 Mailpit）](docs/images/forms-ai-reply.png)
 
-[完整設定與操作指南](docs/forms-ai.md) · [瀏覽器、Mailpit 與程序重啟驗證](docs/forms-ai-verification.md)
+[圖解設定與操作指南](docs/forms-ai.md) · [瀏覽器、Mailpit 與程序重啟驗證](docs/forms-ai-verification.md)
 
 <details>
 <summary>團隊收件、狀態與備註的原有流程</summary>
@@ -87,7 +87,7 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 - **帳號**：第一個打開網頁的人建立管理員，沒有預設帳號，也沒有預設密碼。密碼用 Argon2 雜湊，登入是 HttpOnly cookie。
 - 淺色和深色模式。
 
-表單版本、來源／iframe 設定、會員簽章、AI 用量、回信審核與故障處理見 [表單與 AI 使用指南](docs/forms-ai.md)。[本機完整驗證](docs/forms-ai-verification.md)使用合成資料、fixture 模型與 Mailpit，沒有呼叫付費模型或寄到外部客戶。
+表單版本、來源／iframe 設定、會員簽章、AI 用量、回信審核與故障處理見 [表單與 AI 圖解使用指南](docs/forms-ai.md)。[本機完整驗證](docs/forms-ai-verification.md)使用合成資料、fixture 模型與 Mailpit，沒有呼叫付費模型或寄到外部客戶。
 
 ## 畫面與工作流程
 
