@@ -16,12 +16,29 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 一個 Docker 映像檔就是全部：Rust 後端、React 前端、SQLite 資料庫。
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/screenshot-overview-dark.png">
-    <img src="docs/images/screenshot-overview-light.png" alt="來信工作台：等待時間分流、來信日曆與網站負載" width="100%">
-  </picture>
-</p>
+## 三步處理一封來信
+
+以下三張圖是在隔離的內建 demo 執行個體中，連續操作同一封「產品文件」來信（`#00001`）；不是示意頁面。封面是獨立的信紙與信封插畫，操作圖則來自真實介面。
+
+### 1. 從等最久的信封開始
+
+在總覽以鍵盤開啟「已滿 7 天」信封，收件匣會保留「待處理／已滿 7 天／最舊來信優先」。畫面第一封就是下一步要閱讀的訊息。
+
+![步驟一：打開逾七天信封，收件匣依最舊來信排序](docs/images/workflow-01.png)
+
+### 2. 打開同一封來信
+
+點第一封訊息，閱讀原文與來源，並確認信紙上的編號 `#00001`。右側通知是內建 demo 的歷史紀錄；這段操作沒有送出通知。
+
+![步驟二：閱讀產品文件來信 #00001 與既有處理紀錄](docs/images/workflow-02.png)
+
+### 3. 完成分類，留下接手資訊
+
+把狀態改成「已完成」，再填入只供同事閱讀的備註。畫面同時顯示新狀態、狀態變更紀錄與備註；腳本也向 API 確認資料已儲存，拍完後恢復原狀與時間戳記，移除本次新增的紀錄。
+
+![步驟三：同一封來信已完成，團隊備註確實儲存](docs/images/workflow-03.png)
+
+重拍方式、資料還原與驗證範圍見 [操作驗證](docs/workflow-verification.md)；執行 [capture-workflow.py](docs/capture-workflow.py) 時，帳密由環境變數提供。
 
 ## 功能
 
@@ -45,22 +62,22 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 30 天日曆按瀏覽器時區切日，點任一日期會帶入收件匣的起訖日期。網站負載依待處理封數排序，可只顯示仍有待處理訊息的網站。
 
-![收件匣與相同條件的 CSV 匯出](docs/images/screenshot-inbox-light.png)
-
 ### 閱讀與接續對話
 
 信件原文放在帶收件日期與編號的信紙上，處理紀錄另列為團隊工作區。內容頁保留聯絡方式、狀態選單、備註、通知結果及時間紀錄。列表提供狀態分頁、搜尋、日期篩選、整批處理及 CSV 匯出。
-
-![訊息與團隊備註](docs/images/screenshot-detail-light.png)
 
 ### 網站與成員
 
 每個網站分別設定表單欄位、來源限制、負責人與通知方式。
 
-![網站設定](docs/images/screenshot-site-light.png)
-
 <details>
-<summary>登入、深色與手機畫面</summary>
+<summary>其他功能、登入、深色與手機畫面</summary>
+
+![完整來信工作台](docs/images/screenshot-overview-light.png)
+
+![收件匣與相同條件的 CSV 匯出](docs/images/screenshot-inbox-light.png)
+![訊息與團隊備註](docs/images/screenshot-detail-light.png)
+![網站設定](docs/images/screenshot-site-light.png)
 
 ![登入](docs/images/screenshot-login-light.png)
 ![深色工作桌](docs/images/screenshot-overview-dark.png)
