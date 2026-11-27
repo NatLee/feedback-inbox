@@ -52,7 +52,7 @@ export function TriageBoard({ data }: { data: Stats }) {
             <span>WAITING TO BE HEARD</span>
             <strong>{open.toLocaleString()}</strong>
             <span>
-              封等待處理 <ArrowRight size={13} />
+              封等待處理 <ArrowRight size={16} />
             </span>
           </Link>
         </div>
@@ -68,7 +68,7 @@ export function TriageBoard({ data }: { data: Stats }) {
               </small>
               <strong>
                 {s.value.toLocaleString()}
-                <ArrowRight size={14} />
+                <ArrowRight size={16} />
               </strong>
             </Link>
           ))}
@@ -80,7 +80,7 @@ export function TriageBoard({ data }: { data: Stats }) {
       <div className="letter-sorting">
         <div className="sorting-heading">
           <span className="eyebrow">SORTED BY RECEIVED AGE</span>
-          <Clock3 size={17} />
+          <Clock3 size={16} />
         </div>
         <h3>今天，先拆哪一封？</h3>
         <p>收到至今的時間 · 僅待處理來信</p>
@@ -107,7 +107,7 @@ export function TriageBoard({ data }: { data: Stats }) {
                   <small>封</small>
                 </strong>
                 <span className="envelope-open">
-                  拆閱 <ArrowRight size={13} />
+                  拆閱 <ArrowRight size={16} />
                 </span>
               </div>
             </Link>
@@ -118,12 +118,12 @@ export function TriageBoard({ data }: { data: Stats }) {
             <>
               <span>依收件時間分袋，從最舊開始閱讀。</span>
               <Link to="/inbox?status=open&sort=oldest">
-                全部待處理 <ArrowRight size={13} />
+                全部待處理 <ArrowRight size={16} />
               </Link>
             </>
           ) : (
             <>
-              <CheckCheck size={17} />
+              <CheckCheck size={16} />
               <span>沒有待處理訊息。新來信會出現在這裡。</span>
             </>
           )}
@@ -261,7 +261,7 @@ export function SiteWorkload({ sites }: { sites: Stats["sites"] }) {
         </p>
       )}
       <Link to="/sites" className="workload-manage">
-        管理網站與收件設定 <ArrowRight size={14} />
+        管理網站與收件設定 <ArrowRight size={16} />
       </Link>
     </section>
   );

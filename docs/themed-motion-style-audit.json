@@ -1,0 +1,62 @@
+[
+  {
+    "width": 1440,
+    "route": "/",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "route": "/inbox",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "route": "/inbox/1",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "route": "/sites/1",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "route": "/sites",
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "route": "/settings",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/inbox",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/inbox/1",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/sites/1",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/sites",
+    "violations": []
+  },
+  {
+    "width": 390,
+    "route": "/settings",
+    "violations": []
+  }
+]

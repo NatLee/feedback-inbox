@@ -41,11 +41,11 @@ function Contact({ detail }: { detail: FeedbackDetail }) {
   ].filter((r) => !!r);
   if (rows.length === 0) return null;
   return (
-    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
       {rows.map(({ icon: Icon, text, href }) => (
         <li
           key={text}
-          className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300"
+          className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300"
         >
           <Icon className="size-4 text-zinc-400" />
           {href ? (
@@ -99,13 +99,13 @@ function Notes({
   };
 
   return (
-    <section className="handling-notes card">
+    <section className="handling-notes card" aria-label="處理歷史">
       <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold sm:px-5 dark:border-zinc-800">
-        處理紀錄
+        <span className="section-index">04 / 處理歷史</span>處理紀錄
       </h2>
       <ol className="flex flex-col gap-4 px-4 py-4 sm:px-5">
         <li className="flex gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-          <span className="mt-1.5 size-2 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+          <span className="mt-2 size-2 shrink-0 rounded-full bg-zinc-300 dark:bg-zinc-600" />
           <span>
             從「{detail.site_name}」送進來・{dateTime(detail.created_at)}
           </span>
@@ -116,9 +116,9 @@ function Notes({
               key={note.id}
               className="flex gap-3 text-sm text-zinc-500 dark:text-zinc-400"
             >
-              <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-400" />
+              <span className="mt-2 size-2 shrink-0 rounded-full bg-brand-400" />
               <span>
-                <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                <span className="font-semibold text-zinc-700 dark:text-zinc-200">
                   {note.author}
                 </span>{" "}
                 改成「
@@ -131,10 +131,10 @@ function Notes({
               <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300">
                 {Array.from(note.author)[0]}
               </span>
-              <div className="min-w-0 flex-1 rounded-xl bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
+              <div className="min-w-0 flex-1 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/60">
                 <div className="flex items-center justify-between gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                   <span>
-                    <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">
                       {note.author}
                     </span>
                     ・
@@ -144,11 +144,11 @@ function Notes({
                   </span>
                   {(note.user_id === me.id || me.role === "admin") && (
                     <button
-                      className="btn btn-ghost -mr-1.5 px-1 py-0.5"
+                      className="btn btn-ghost -mr-2 px-1 py-1"
                       title="刪除備註"
                       onClick={() => void remove(note)}
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-4" />
                     </button>
                   )}
                 </div>
@@ -191,7 +191,7 @@ function Side({ detail }: { detail: FeedbackDetail }) {
     <>
       <section className="card p-4 text-sm">
         <h2 className="mb-3 text-sm font-semibold">來源</h2>
-        <dl className="flex flex-col gap-2.5">
+        <dl className="flex flex-col gap-3">
           <div>
             <dt className="text-xs text-zinc-500 dark:text-zinc-400">網站</dt>
             <dd>
@@ -221,7 +221,7 @@ function Side({ detail }: { detail: FeedbackDetail }) {
                     rel="noreferrer noopener"
                   >
                     {detail.page_url}{" "}
-                    <ExternalLink className="mt-1 size-3 shrink-0" />
+                    <ExternalLink className="mt-1 size-4 shrink-0" />
                   </a>
                 ) : (
                   detail.page_url
@@ -255,18 +255,18 @@ function Side({ detail }: { detail: FeedbackDetail }) {
             這則訊息沒有送出通知。
           </p>
         ) : (
-          <ul className="flex flex-col gap-2.5">
+          <ul className="flex flex-col gap-3">
             {detail.deliveries.map((d, i) => (
               <li key={i} className="flex items-start gap-2">
                 {d.ok ? (
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <CheckCircle2 className="mt-1 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 ) : (
-                  <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                  <XCircle className="mt-1 size-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 )}
                 <span className="min-w-0">
                   <span className="block">
                     {CHANNEL_LABEL[d.channel] ?? d.channel}
-                    <span className="ml-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
                       {d.ok ? "已送出" : "失敗"}
                     </span>
                   </span>
@@ -336,10 +336,10 @@ export function FeedbackDetailPage() {
       {data && (
         <div className="letter-workspace grid gap-4 lg:grid-cols-[1fr_18rem]">
           <div className="flex min-w-0 flex-col gap-4">
-            <section className="message-paper card p-4 sm:p-5">
+            <section className="message-paper card p-4 sm:p-5" key={data.id} aria-label="來信閱讀">
               <div className="letter-letterhead">
                 <span>
-                  ORIGINAL CORRESPONDENCE
+                  03 / 來信閱讀
                   <small>來信原文 / #{String(data.id).padStart(5, "0")}</small>
                 </span>
                 <span className="received-stamp">
@@ -382,6 +382,10 @@ export function FeedbackDetailPage() {
                   )}
                 </div>
               </div>
+              <p className="letter-state" key={data.status}>
+                <span className="letter-state-mark" aria-hidden="true" />
+                目前狀態 · {STATUS_LABEL[data.status]}
+              </p>
               <p className="prose-message mt-5 border-t border-zinc-100 pt-4 dark:border-zinc-800">
                 {data.message || (
                   <span className="text-zinc-500 dark:text-zinc-400">
@@ -390,7 +394,7 @@ export function FeedbackDetailPage() {
                 )}
               </p>
               {data.extra.length > 0 && (
-                <dl className="mt-4 grid gap-x-4 gap-y-2 rounded-xl bg-zinc-50 p-3 text-sm sm:grid-cols-[auto_1fr] dark:bg-zinc-800/60">
+                <dl className="mt-4 grid gap-x-4 gap-y-2 rounded-lg bg-zinc-50 p-3 text-sm sm:grid-cols-[auto_1fr] dark:bg-zinc-800/60">
                   {data.extra.map((field) => (
                     <div key={field.name} className="contents">
                       <dt className="font-mono text-xs leading-6 text-zinc-500 dark:text-zinc-400">

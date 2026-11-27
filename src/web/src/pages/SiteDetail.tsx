@@ -38,7 +38,7 @@ function CopyButton({ text, label = "複製" }: { text: string; label?: string }
   };
   return (
     <button type="button" className="btn btn-secondary px-2 py-1 text-xs" onClick={() => void copy()}>
-      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "複製了" : label}
+      {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "複製了" : label}
     </button>
   );
 }
@@ -46,11 +46,11 @@ function CopyButton({ text, label = "複製" }: { text: string; label?: string }
 function Snippet({ title, code }: { title: string; code: string }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-300">{title}</h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">{title}</h3>
         <CopyButton text={code} />
       </div>
-      <pre className="overflow-x-auto rounded-xl bg-zinc-900 p-3 font-mono text-xs leading-5 text-zinc-100 dark:bg-zinc-950 dark:ring-1 dark:ring-zinc-800">
+      <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-3 font-mono text-xs leading-5 text-zinc-100 dark:bg-zinc-950 dark:ring-1 dark:ring-zinc-800">
         {code}
       </pre>
     </div>
@@ -106,11 +106,11 @@ function Embed({ site, onRotated }: { site: Site; onRotated: (site: Site) => voi
           <code className="min-w-0 flex-1 truncate rounded-lg bg-zinc-100 px-3 py-2 font-mono text-sm dark:bg-zinc-800">{endpoint}</code>
           <CopyButton text={endpoint} />
           <a className="btn btn-secondary px-2 py-1 text-xs" href={endpoint} target="_blank" rel="noreferrer noopener">
-            <ExternalLink className="size-3.5" /> 現成的表單頁
+            <ExternalLink className="size-4" /> 現成的表單頁
           </a>
           {admin && (
             <button className="btn btn-secondary px-2 py-1 text-xs" disabled={busy} onClick={() => void rotate()}>
-              {busy ? <Spinner className="size-3.5" /> : <RefreshCw className="size-3.5" />} 換網址
+              {busy ? <Spinner className="size-3.5" /> : <RefreshCw className="size-4" />} 換網址
             </button>
           )}
         </div>
@@ -128,7 +128,7 @@ function Embed({ site, onRotated }: { site: Site; onRotated: (site: Site) => voi
 
 function TestOutcome({ result }: { result: TestResult }) {
   return (
-    <div className="mt-3 rounded-xl bg-zinc-50 p-3 text-sm dark:bg-zinc-800/60">
+    <div className="mt-3 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-800/60">
       {result.outcomes.length === 0 && (
         <p className="text-zinc-600 dark:text-zinc-300">
           {result.no_recipients
@@ -142,9 +142,9 @@ function TestOutcome({ result }: { result: TestResult }) {
         {result.outcomes.map((o, i) => (
           <li key={i} className="flex items-start gap-2">
             {o.ok ? (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <CheckCircle2 className="mt-1 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
             ) : (
-              <XCircle className="mt-0.5 size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+              <XCircle className="mt-1 size-4 shrink-0 text-rose-600 dark:text-rose-400" />
             )}
             <span className="min-w-0">
               <span className="break-all">
@@ -311,8 +311,8 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
             />
             <p className="hint">HTML 表單送出之後帶訪客去的頁面；留白就顯示內建的感謝頁。</p>
           </div>
-          <label className="flex cursor-pointer items-start gap-2.5 text-sm sm:col-span-2">
-            <input type="checkbox" className="mt-0.5 size-4 accent-brand-600" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <label className="flex cursor-pointer items-start gap-3 text-sm sm:col-span-2">
+            <input type="checkbox" className="mt-1 size-4 accent-brand-600" checked={active} onChange={(e) => setActive(e.target.checked)} />
             <span>
               收新的訊息
               <span className="block text-xs text-zinc-500 dark:text-zinc-400">關掉之後表單會被退回，已經收到的訊息還在。</span>
@@ -323,13 +323,13 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
 
       <Section title="負責人" hint="負責人看得到這個網站的訊息；管理員每個網站都看得到。">
         <div className="p-4 sm:p-5">
-          <div className="max-h-56 overflow-y-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <div className="max-h-56 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
             {accounts
               .filter((a) => !a.disabled || members.has(a.id))
               .map((a) => (
                 <label
                   key={a.id}
-                  className="flex cursor-pointer items-center gap-2.5 border-b border-zinc-100 px-3 py-2 text-sm last:border-b-0 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
+                  className="flex cursor-pointer items-center gap-3 border-b border-zinc-100 px-3 py-2 text-sm last:border-b-0 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
                 >
                   <input
                     type="checkbox"
@@ -357,10 +357,10 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
         }
       >
         <div className="flex flex-col gap-4 p-4 sm:p-5">
-          <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+          <label className="flex cursor-pointer items-start gap-3 text-sm">
             <input
               type="checkbox"
-              className="mt-0.5 size-4 accent-brand-600"
+              className="mt-1 size-4 accent-brand-600"
               checked={notifyEmail}
               onChange={(e) => setNotifyEmail(e.target.checked)}
             />

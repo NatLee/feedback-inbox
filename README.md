@@ -38,7 +38,11 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 ![步驟三：同一封來信已完成，團隊備註確實儲存](docs/images/workflow-03.png)
 
+[觀看實際選信、狀態與備註動態（WebM）](docs/images/feature-motion.webm)。選取定位線以 160 ms 回饋；閱讀、已儲存狀態與處理紀錄以 180 ms 銜接。系統啟用「減少動態」時立即呈現最後狀態。影片只記錄已登入的隔離 demo，不含登入畫面。
+
 重拍方式、資料還原與驗證範圍見 [操作驗證](docs/workflow-verification.md)；執行 [capture-workflow.py](docs/capture-workflow.py) 時，帳密由環境變數提供。
+
+新版來源樣式、桌面／手機檢查與錄影驗證見 [主題動態驗證](docs/themed-motion-verification.md)。
 
 ## 功能
 

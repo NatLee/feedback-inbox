@@ -1,0 +1,61 @@
+/* State-linked correspondence feedback: no clocks or speculative activity. */
+.folder-heading {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px 8px 0;
+  color: var(--color-zinc-500);
+  font-size: 11px;
+  font-weight: 600;
+}
+.mail-row { position: relative; }
+.mail-row::before {
+  content: "";
+  position: absolute;
+  inset: 12px auto 12px 0;
+  width: 4px;
+  background: var(--color-brand-600);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 160ms ease;
+}
+.mail-row[data-selected="true"]::before,
+.mail-row:focus-within::before { transform: scaleY(1); }
+.mail-row .sender-seal { transition: transform 160ms ease; }
+.mail-row[data-selected="true"] .sender-seal { transform: translateX(4px); }
+.message-paper { animation: letter-open 180ms ease-out; }
+.section-index {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--color-brand-700);
+  letter-spacing: 0.08em;
+}
+.dark .section-index { color: var(--color-brand-300); }
+.letter-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 0;
+  color: var(--color-zinc-600);
+  font-size: 12px;
+  animation: state-receipt 180ms ease-out;
+}
+.dark .letter-state { color: var(--color-zinc-300); }
+.letter-state-mark { width: 16px; height: 4px; background: var(--color-brand-600); }
+.handling-notes ol > li { animation: history-arrive 180ms ease-out; }
+@keyframes letter-open {
+  from { opacity: 0.5; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes state-receipt {
+  from { transform: translateX(-4px); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes history-arrive {
+  from { opacity: 0.5; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-paper, .letter-state, .handling-notes ol > li { animation: none; }
+  .mail-row::before, .mail-row .sender-seal { transition: none; }
+}

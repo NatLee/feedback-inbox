@@ -138,7 +138,7 @@ export function InboxPage() {
     <PageBody>
       <PageHeader
         title="收件匣"
-        subtitle="INCOMING MAIL / 依來源與收件時間，整理每一個聲音。"
+        subtitle="01 / 到件帳 · 依來源與收件時間，整理每一個聲音。"
         actions={
           <a
             className="btn btn-secondary"
@@ -155,15 +155,16 @@ export function InboxPage() {
         role="tablist"
         aria-label="狀態"
       >
+        <span className="folder-heading">02 / 狀態分類</span>
         {TABS.map((tab) => (
           <button
             key={tab.value}
             role="tab"
             aria-selected={status === tab.value}
             onClick={() => set({ status: tab.value || undefined })}
-            className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm transition-colors ${
               status === tab.value
-                ? "bg-brand-600 font-medium text-white dark:bg-brand-500 dark:text-zinc-950"
+                ? "bg-brand-600 font-semibold text-white dark:bg-brand-500 dark:text-zinc-950"
                 : "text-zinc-600 hover:bg-zinc-200/70 dark:text-zinc-400 dark:hover:bg-zinc-800"
             }`}
           >
@@ -197,7 +198,7 @@ export function InboxPage() {
             </option>
           ))}
         </select>
-        <div className="flex items-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
           <input
             className="input w-auto"
             type="date"
@@ -258,7 +259,7 @@ export function InboxPage() {
       {list.data && (
         <div className="mail-list card overflow-hidden">
           <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
-            <label className="flex items-center gap-2.5 text-sm">
+            <label className="flex items-center gap-3 text-sm">
               <input
                 type="checkbox"
                 className="size-4 accent-brand-600"
@@ -272,7 +273,7 @@ export function InboxPage() {
                 }
               />
               {selected.size > 0 ? (
-                <span className="font-medium">選了 {selected.size} 則</span>
+                <span className="font-semibold">選了 {selected.size} 則</span>
               ) : (
                 <span className="text-zinc-500 dark:text-zinc-400">
                   共 {total.toLocaleString()} 則
@@ -280,7 +281,7 @@ export function InboxPage() {
               )}
             </label>
             {selected.size > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-zinc-500 dark:text-zinc-400">
                   改成
                 </span>
@@ -313,6 +314,7 @@ export function InboxPage() {
               {items.map((item) => (
                 <li
                   key={item.id}
+                  data-selected={selected.has(item.id)}
                   className={`mail-row flex items-start gap-3 px-3 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${
                     selected.has(item.id)
                       ? "bg-brand-50/60 dark:bg-brand-950/30"
@@ -335,11 +337,11 @@ export function InboxPage() {
                   >
                     <span className="min-w-0">
                       <span
-                        className={`block truncate text-sm ${item.status === "new" ? "font-semibold" : "font-medium"}`}
+                        className={`block truncate text-sm ${item.status === "new" ? "font-semibold" : "font-normal"}`}
                       >
                         {item.status === "new" && (
                           <span
-                            className="mr-1.5 inline-block size-2 rounded-full bg-amber-500 align-middle"
+                            className="mr-2 inline-block size-2 rounded-full bg-amber-500 align-middle"
                             aria-hidden
                           />
                         )}
@@ -357,10 +359,10 @@ export function InboxPage() {
                         <span className="mail-routing">{item.site_name}</span>
                         {item.note_count > 0 && (
                           <span
-                            className="inline-flex items-center gap-0.5"
+                            className="inline-flex items-center gap-1"
                             title={`${item.note_count} 則備註`}
                           >
-                            <MessageSquare className="size-3" />{" "}
+                            <MessageSquare className="size-4" />{" "}
                             {item.note_count}
                           </span>
                         )}
