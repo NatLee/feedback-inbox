@@ -329,7 +329,7 @@ pub async fn evaluate(
         ));
     }
     let rule = &matches[0];
-    let template=sqlx::query("SELECT t.* FROM ai_templates t JOIN users u ON u.id=t.approved_by WHERE t.id=? AND t.site_id=? AND t.state='approved' AND u.role='admin' AND u.disabled=0").bind(rule.template_id).bind(source.site_id).fetch_optional(&mut *tx).await?;
+    let template=sqlx::query("SELECT t.* FROM ai_templates t JOIN users u ON u.id=t.approved_by WHERE t.id=? AND t.site_id=? AND t.state='approved' AND u.role='admin' AND u.disabled=0 AND u.account_status='active'").bind(rule.template_id).bind(source.site_id).fetch_optional(&mut *tx).await?;
     let Some(template) = template else {
         return Ok(review("template_unapproved", "範本版本已變更或尚未核准"));
     };

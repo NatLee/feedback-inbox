@@ -194,7 +194,7 @@ pub async fn prepare(
     if fields.is_empty() {
         return Err(AppError::bad("沒有可供分析的已允許欄位"));
     }
-    let rows:Vec<(i64,String,String)>=sqlx::query_as("SELECT k.id,k.title,k.body FROM ai_knowledge k JOIN users u ON u.id=k.approved_by WHERE k.site_id=? AND k.state='approved' AND u.disabled=0 AND u.role='admin' ORDER BY k.id DESC LIMIT 5").bind(source.site_id).fetch_all(&mut *tx).await?;
+    let rows:Vec<(i64,String,String)>=sqlx::query_as("SELECT k.id,k.title,k.body FROM ai_knowledge k JOIN users u ON u.id=k.approved_by WHERE k.site_id=? AND k.state='approved' AND u.disabled=0 AND u.account_status='active' AND u.role='admin' ORDER BY k.id DESC LIMIT 5").bind(source.site_id).fetch_all(&mut *tx).await?;
     let mut knowledge = Vec::new();
     let mut total = fields.iter().map(|f| f.text.chars().count()).sum::<usize>();
     for (id, title, body) in rows {
@@ -206,7 +206,7 @@ pub async fn prepare(
             "選取內容超過 20000 字，請縮小欄位或知識範圍；系統不會自動截斷",
         ));
     }
-    let owner_ids=sqlx::query_scalar("SELECT id FROM users u WHERE disabled=0 AND (role='admin' OR EXISTS(SELECT 1 FROM site_members m WHERE m.site_id=? AND m.user_id=u.id)) ORDER BY id").bind(source.site_id).fetch_all(tx).await?;
+    let owner_ids=sqlx::query_scalar("SELECT id FROM users u WHERE disabled=0 AND account_status='active' AND (role='admin' OR EXISTS(SELECT 1 FROM site_members m WHERE m.site_id=? AND m.user_id=u.id)) ORDER BY id").bind(source.site_id).fetch_all(tx).await?;
     Ok(Input {
         fields,
         categories: settings.categories.clone(),

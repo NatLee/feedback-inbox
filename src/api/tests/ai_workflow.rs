@@ -465,6 +465,7 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
             "knowledge",
             "provider",
             "field_permission",
+            "account_status",
         ] {
             let entered = Arc::new(tokio::sync::Notify::new());
             let release = Arc::new(tokio::sync::Notify::new());
@@ -605,6 +606,13 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
                         .await
                         .unwrap();
                 }
+                "account_status" => {
+                    sqlx::query("UPDATE users SET account_status='pending' WHERE id=?")
+                        .bind(uid)
+                        .execute(&app.state.db)
+                        .await
+                        .unwrap();
+                }
                 "field_permission" => {
                     let form_path = format!("/api/sites/{sid}/form");
                     let form = app.get(&admin, &form_path).await;
@@ -658,4 +666,84 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
             server.abort();
         }
     }
+}
+
+#[tokio::test]
+async fn inactive_registration_cannot_receive_staff_content_or_authorize_knowledge() {
+    use axum::http::Method;
+    let app = TestApp::new().await;
+    let admin = app.admin().await;
+    let (uid, member) = app.member(&admin, "pending-staff").await;
+    app.ok(
+        &member,
+        Method::PATCH,
+        "/api/auth/me",
+        json!({"email":"pending-staff@example.test"}),
+    )
+    .await;
+    let site = app
+        .site(
+            &admin,
+            json!({"name":"Active staff","member_ids":[uid],"notify_email":true}),
+        )
+        .await;
+    let sid = site["id"].as_i64().unwrap();
+    assert_eq!(
+        feedback_inbox::notify::targets(&app.state, sid)
+            .await
+            .unwrap()
+            .emails,
+        vec!["pending-staff@example.test"]
+    );
+    let k = app
+        .ok(
+            &admin,
+            Method::POST,
+            &format!("/api/sites/{sid}/ai/knowledge"),
+            json!({"title":"Policy","body":"Approved fact"}),
+        )
+        .await;
+    let kid = k["id"].as_i64().unwrap();
+    app.ok(
+        &admin,
+        Method::POST,
+        &format!("/api/sites/{sid}/ai/knowledge/{kid}/approve"),
+        json!({"expected_revision":1}),
+    )
+    .await;
+    sqlx::query("UPDATE users SET account_status='pending' WHERE id=?")
+        .bind(uid)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    assert!(feedback_inbox::notify::targets(&app.state, sid)
+        .await
+        .unwrap()
+        .emails
+        .is_empty());
+    let context = app.get(&admin, &format!("/api/sites/{sid}/ai")).await;
+    assert!(!context["members"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|u| u["id"] == uid));
+    let aid = app.get(&admin, "/api/auth/state").await["user"]["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE users SET account_status='rejected' WHERE id=?")
+        .bind(aid)
+        .execute(&app.state.db)
+        .await
+        .unwrap();
+    let mut tx = app.state.db.begin().await.unwrap();
+    assert!(
+        feedback_inbox::ai::authority(&mut tx, uid, Some(sid), false)
+            .await
+            .is_err()
+    );
+    assert!(
+        feedback_inbox::ai::policy::knowledge_valid(&mut tx, sid, &[kid])
+            .await
+            .is_err()
+    );
 }

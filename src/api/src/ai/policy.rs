@@ -211,7 +211,7 @@ pub async fn knowledge_valid(
         return Err(AppError::bad("最多引用 5 筆核准資料"));
     }
     for id in ids {
-        let valid:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_knowledge k JOIN users u ON u.id=k.approved_by WHERE k.id=? AND k.site_id=? AND k.state='approved' AND u.disabled=0 AND u.role='admin')").bind(id).bind(site).fetch_one(&mut *tx).await?;
+        let valid:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_knowledge k JOIN users u ON u.id=k.approved_by WHERE k.id=? AND k.site_id=? AND k.state='approved' AND u.disabled=0 AND u.account_status='active' AND u.role='admin')").bind(id).bind(site).fetch_one(&mut *tx).await?;
         if !valid {
             return Err(AppError::conflict("引用的知識已變更、停用或尚未核准"));
         }
@@ -222,7 +222,7 @@ pub async fn context(state: &AppState, site: i64) -> AppResult<Value> {
     let form = forms::load_version(&state.db, site, None).await?;
     let mut tx = state.db.begin().await?;
     let settings = load(&mut tx, site).await?;
-    let members:Vec<(i64,String)>=sqlx::query_as("SELECT u.id,u.display_name FROM users u WHERE u.disabled=0 AND (u.role='admin' OR EXISTS(SELECT 1 FROM site_members m WHERE m.site_id=? AND m.user_id=u.id)) ORDER BY u.id").bind(site).fetch_all(&mut *tx).await?;
+    let members:Vec<(i64,String)>=sqlx::query_as("SELECT u.id,u.display_name FROM users u WHERE u.disabled=0 AND u.account_status='active' AND (u.role='admin' OR EXISTS(SELECT 1 FROM site_members m WHERE m.site_id=? AND m.user_id=u.id)) ORDER BY u.id").bind(site).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     Ok(
         json!({"settings":settings,"providers":super::providers::list(state).await?,"fields":form.schema.fields,"members":members.into_iter().map(|(id,name)|json!({"id":id,"display_name":name})).collect::<Vec<_>>(),"capabilities":{"encryption_ready":state.config.workflow.secret_key.is_some(),"smtp_ready":state.mailer.is_some(),"auto_send_enabled":state.config.workflow.auto_send_enabled}}),

@@ -13,11 +13,12 @@ pub async fn authority(
     site: Option<i64>,
     admin: bool,
 ) -> AppResult<()> {
-    let role: Option<String> =
-        sqlx::query_scalar("SELECT role FROM users WHERE id=? AND disabled=0")
-            .bind(actor)
-            .fetch_optional(&mut *tx)
-            .await?;
+    let role: Option<String> = sqlx::query_scalar(
+        "SELECT role FROM users WHERE id=? AND disabled=0 AND account_status='active'",
+    )
+    .bind(actor)
+    .fetch_optional(&mut *tx)
+    .await?;
     let Some(role) = role else {
         return Err(AppError::forbidden("執行者已停用或移除"));
     };

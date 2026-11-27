@@ -346,7 +346,7 @@ pub async fn targets(state: &AppState, site_id: i64) -> Result<Targets> {
     let emails = if notify_email {
         sqlx::query_scalar(
             "SELECT u.email FROM site_members m JOIN users u ON u.id = m.user_id
-             WHERE m.site_id = ? AND u.disabled = 0 AND u.email != '' ORDER BY u.id",
+             WHERE m.site_id = ? AND u.disabled = 0 AND u.account_status = 'active' AND u.email != '' ORDER BY u.id",
         )
         .bind(site_id)
         .fetch_all(&state.db)
@@ -412,7 +412,7 @@ pub async fn enqueue(
             .fetch_one(&mut *tx)
             .await?;
     if email {
-        let targets:Vec<String>=sqlx::query_scalar("SELECT u.email FROM users u JOIN site_members m ON m.user_id=u.id WHERE m.site_id=? AND u.disabled=0 AND u.email!=''").bind(site).fetch_all(&mut *tx).await?;
+        let targets:Vec<String>=sqlx::query_scalar("SELECT u.email FROM users u JOIN site_members m ON m.user_id=u.id WHERE m.site_id=? AND u.disabled=0 AND u.account_status='active' AND u.email!=''").bind(site).fetch_all(&mut *tx).await?;
         for target in targets {
             let hash = crate::auth::sha256_hex(&target);
             crate::jobs::enqueue(
@@ -482,7 +482,7 @@ pub async fn execute(state: &AppState, claim: &crate::jobs::Claim) -> crate::err
             .as_str()
             .ok_or_else(|| AppError::bad("通知收件者格式不符"))?
             .to_owned();
-        let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sites s JOIN site_members m ON m.site_id=s.id JOIN users u ON u.id=m.user_id WHERE s.id=? AND s.notify_email=1 AND u.disabled=0 AND u.email=?)").bind(row.site_id).bind(&target).fetch_one(&mut *tx).await?;
+        let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sites s JOIN site_members m ON m.site_id=s.id JOIN users u ON u.id=m.user_id WHERE s.id=? AND s.notify_email=1 AND u.disabled=0 AND u.account_status='active' AND u.email=?)").bind(row.site_id).bind(&target).fetch_one(&mut *tx).await?;
         if !allowed {
             return Err(AppError::conflict("通知收件者已變更"));
         }
