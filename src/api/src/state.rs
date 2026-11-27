@@ -8,6 +8,7 @@ use crate::{auth::LoginLimiter, config::Config, notify::Mailer, ratelimit::RateL
 pub type AppState = Arc<Inner>;
 
 pub struct Inner {
+    pub ai_slots: tokio::sync::Semaphore,
     pub access: std::sync::OnceLock<access_kit::AccessKit>,
     pub db: SqlitePool,
     pub config: Config,
@@ -29,6 +30,7 @@ impl Inner {
             .user_agent(concat!("feedback-inbox/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {
+            ai_slots: tokio::sync::Semaphore::new(config.workflow.concurrency),
             access: std::sync::OnceLock::new(),
             db,
             submissions: RateLimiter::new(config.rate_limit, Duration::from_secs(60)),

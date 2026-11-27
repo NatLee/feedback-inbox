@@ -6,7 +6,7 @@ use crate::{
     error::{AppError, AppResult},
     forms::{self, FormVersion, NormalizedAnswers},
     intake::{truncate, HONEYPOT},
-    notify::{self, escape_html, Notice},
+    notify::{self, escape_html},
     routes::sites::parse_list,
     state::AppState,
 };
@@ -267,7 +267,7 @@ pub async fn submit(
             "只收 application/json 或 application/x-www-form-urlencoded",
         ))
     };
-    let input = match input {
+    let mut input = match input {
         Ok(v) if v.is_object() => v,
         Ok(_) => return fail(AppError::bad("內容要是 JSON 物件")),
         Err(e) => return fail(e),
@@ -303,6 +303,41 @@ pub async fn submit(
                 Ok(v) => v,
                 Err(e) => return fail(e),
             };
+            let identity = match input.get("_identity_token") {
+                None => None,
+                Some(value) => {
+                    let Some(token) = value.as_str() else {
+                        return fail(AppError::bad("會員憑證格式不符"));
+                    };
+                    match forms::identity::verify_for_site(&state, site.id, token).await {
+                        Ok(identity) => Some(identity),
+                        Err(e) => return fail(e),
+                    }
+                }
+            };
+            if let Some(email) = identity
+                .as_ref()
+                .and_then(|identity| identity.email.as_ref())
+            {
+                let submitted = match crate::intake::Submission::from_json(&input) {
+                    Ok(value) => value,
+                    Err(e) => return fail(AppError::bad(e)),
+                };
+                if !submitted.email.is_empty() && !submitted.email.eq_ignore_ascii_case(email) {
+                    return fail(AppError::bad("Email 與已驗證會員身分不符"));
+                }
+                let object = input.as_object_mut().expect("object checked");
+                object.insert("email".into(), json!(email));
+                object.remove("mail");
+                object.remove("e-mail");
+            }
+            let test_token = match input.get("_test_token") {
+                None => None,
+                Some(value) => match value.as_str() {
+                    Some(value) => Some(value.to_owned()),
+                    None => return fail(AppError::bad("測試憑證格式不符")),
+                },
+            };
             let answers =
                 match forms::validate_answers(&version.schema, &input, requested.is_none()) {
                     Ok(a) => a,
@@ -327,6 +362,8 @@ pub async fn submit(
                 submission_id.as_deref(),
                 &hash,
                 requested.is_none(),
+                identity.as_ref(),
+                test_token.as_deref(),
             )
             .await
             {
@@ -359,6 +396,8 @@ async fn store(
     submission_key: Option<&str>,
     hash: &str,
     legacy: bool,
+    identity: Option<&forms::identity::VerifiedIdentity>,
+    test_token: Option<&str>,
 ) -> AppResult<()> {
     let mut tx = state.db.begin_with("BEGIN IMMEDIATE").await?;
     if let Some(key) = submission_key {
@@ -377,31 +416,67 @@ async fn store(
             return Ok(());
         }
     }
+    let (active, current): (bool, Option<i64>) =
+        sqlx::query_as("SELECT active,published_form_version_id FROM sites WHERE id=?")
+            .bind(site.id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if !active {
+        return Err(AppError::forbidden("這張表單已經關閉"));
+    }
+    if legacy && current != Some(version.id) {
+        return Err(AppError::conflict("表單已更新，請重新載入後送出"));
+    }
+    let valid:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM form_versions WHERE id=? AND site_id=? AND retired_at IS NULL)").bind(version.id).bind(site.id).fetch_one(&mut *tx).await?;
+    if !valid {
+        return Err(AppError::coded(
+            410,
+            "form_version_retired",
+            "這個表單版本已停用，請重新開啟表單網址",
+        ));
+    }
+    if let Some(identity) = identity {
+        forms::identity::consume(&mut tx, site.id, identity).await?;
+    }
+    if let Some(token) = test_token {
+        forms::identity::consume_verification(&mut tx, site.id, token).await?;
+    }
     let now = db::now();
     let s = answers.submission;
-    let id=sqlx::query("INSERT INTO feedback(site_id,name,email,phone,company,message,extra,ip,user_agent,page_url,created_at,updated_at,form_version_id,answers_json,submission_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
- .bind(site.id).bind(&s.name).bind(&s.email).bind(&s.phone).bind(&s.company).bind(&s.message).bind(serde_json::to_string(&s.extra)?).bind(ip).bind(header_text(headers,header::USER_AGENT,300)).bind(header_text(headers,header::REFERER,500)).bind(&now).bind(&now).bind(version.id).bind(answers.values.to_string()).bind(if legacy{"legacy_unversioned"}else{"versioned"}).execute(&mut *tx).await?.last_insert_rowid();
+    let id=sqlx::query("INSERT INTO feedback(site_id,name,email,phone,company,message,extra,ip,user_agent,page_url,created_at,updated_at,form_version_id,answers_json,submission_mode,identity_json,is_test) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+ .bind(site.id).bind(&s.name).bind(&s.email).bind(&s.phone).bind(&s.company).bind(&s.message).bind(serde_json::to_string(&s.extra)?).bind(ip).bind(header_text(headers,header::USER_AGENT,300)).bind(header_text(headers,header::REFERER,500)).bind(&now).bind(&now).bind(version.id).bind(answers.values.to_string()).bind(if legacy{"legacy_unversioned"}else{"versioned"}).bind(identity.map(serde_json::to_value).transpose()?.unwrap_or(json!({})).to_string()).bind(test_token.is_some()).execute(&mut *tx).await?.last_insert_rowid();
     if let Some(key) = submission_key {
         sqlx::query("INSERT INTO submission_receipts(site_id,submission_key,request_hash,feedback_id,expires_at) VALUES(?,?,?,?,?)").bind(site.id).bind(key).bind(hash).bind(id).bind(chrono::Utc::now().timestamp()+7*86400).execute(&mut *tx).await?;
     }
+    if test_token.is_none() {
+        notify::enqueue(&mut tx, site.id, id).await?;
+        let settings = crate::ai::policy::load(&mut tx, site.id).await?;
+        if settings.enabled && settings.generate_on_receipt {
+            if let Some(actor) = settings.updated_by {
+                sqlx::query("SAVEPOINT ai_intake").execute(&mut *tx).await?;
+                if crate::ai::analysis::enqueue(&mut tx, state, id, actor)
+                    .await
+                    .is_err()
+                {
+                    sqlx::query("ROLLBACK TO ai_intake")
+                        .execute(&mut *tx)
+                        .await?;
+                    crate::workflow_audit::record(
+                        &mut tx,
+                        Some(site.id),
+                        Some(actor),
+                        "feedback",
+                        id,
+                        "automatic_analysis_skipped",
+                        json!({"reason":"configuration_or_input_unavailable"}),
+                    )
+                    .await?;
+                }
+                sqlx::query("RELEASE ai_intake").execute(&mut *tx).await?;
+            }
+        }
+    }
     tx.commit().await?;
-    let notice = Notice {
-        site_name: site.name.clone(),
-        feedback_id: id,
-        name: s.name,
-        email: s.email,
-        phone: s.phone,
-        company: s.company,
-        message: s.message,
-        extra: s.extra,
-        created_at: now,
-        link: state
-            .config
-            .public_url
-            .as_ref()
-            .map(|base| format!("{base}/inbox/{id}")),
-    };
-    tokio::spawn(notify::deliver(state.clone(), site.id, notice));
     Ok(())
 }
 pub async fn preflight(

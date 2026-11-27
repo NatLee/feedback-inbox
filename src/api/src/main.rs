@@ -52,10 +52,14 @@ async fn serve(config: Config) -> Result<()> {
     let listener = TcpListener::bind(&bind).await?;
     tracing::info!("網頁介面：http://{}", listener.local_addr()?);
     // 要知道連進來的 IP，表單的流量限制才有辦法算
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    let worker = tokio::spawn(feedback_inbox::jobs::run_worker(state.clone(), shutdown));
     let service = app(state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, service)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+    let _ = stop.send(true);
+    worker.await?;
     tracing::info!("已停止");
     Ok(())
 }

@@ -15,6 +15,11 @@ name = "feedback-inbox"
 path = "src/main.rs"
 
 [dependencies]
+aes-gcm = "0.10"
+base64 = "0.22"
+hmac = "0.12"
+regex = "1"
+ai-kit = { path = "../../crates/ai-kit" }
 access-kit = { path = "../../crates/access-kit" }
 tower = { version = "0.5", features = ["util"] }
 anyhow = "1"

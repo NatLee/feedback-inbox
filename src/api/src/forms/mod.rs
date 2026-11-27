@@ -1,3 +1,4 @@
+pub mod identity;
 pub mod render;
 pub mod snippets;
 pub mod types;

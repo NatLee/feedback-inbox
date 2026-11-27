@@ -415,6 +415,7 @@ mod tests {
             trust_proxy: false,
             rate_limit: 10,
             smtp: None,
+            workflow: Default::default(),
         }
     }
 

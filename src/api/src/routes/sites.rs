@@ -73,9 +73,9 @@ pub struct Site {
 const SITE_SELECT: &str =
     "SELECT s.id, s.name, s.url, s.key, s.allowed_origins, s.origin_mode, s.embed_origins, s.required_fields, s.redirect_url,
         s.webhook_url, s.notify_email, s.active, s.created_at,
-        (SELECT COUNT(*) FROM feedback f WHERE f.site_id = s.id) AS total,
+        (SELECT COUNT(*) FROM feedback f WHERE f.is_test=0 AND f.site_id = s.id) AS total,
         (SELECT COUNT(*) FROM feedback f
-          WHERE f.site_id = s.id AND f.status IN ('new', 'in_progress')) AS unhandled
+          WHERE f.is_test=0 AND f.site_id = s.id AND f.status IN ('new', 'in_progress')) AS unhandled
      FROM sites s";
 
 pub fn parse_list(json: &str) -> Vec<String> {

@@ -27,6 +27,61 @@ pub struct SmtpConfig {
     pub tls: SmtpTls,
 }
 
+#[derive(Clone)]
+pub struct EncryptionKey(pub [u8; 32]);
+impl std::fmt::Debug for EncryptionKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[REDACTED]")
+    }
+}
+#[derive(Clone, Debug)]
+pub struct WorkflowConfig {
+    pub secret_key: Option<EncryptionKey>,
+    pub secret_error: Option<String>,
+    pub allowed_ollama_origins: Vec<String>,
+    pub auto_send_enabled: bool,
+    pub concurrency: usize,
+}
+impl Default for WorkflowConfig {
+    fn default() -> Self {
+        Self {
+            secret_key: None,
+            secret_error: None,
+            allowed_ollama_origins: vec!["http://127.0.0.1:11434".into()],
+            auto_send_enabled: false,
+            concurrency: 2,
+        }
+    }
+}
+impl WorkflowConfig {
+    fn from_env() -> Self {
+        use base64::Engine;
+        let mut config = Self::default();
+        if let Some(value) = var("FI_AI_SECRET_KEY") {
+            match base64::engine::general_purpose::STANDARD
+                .decode(value.trim())
+                .ok()
+                .and_then(|v| v.try_into().ok())
+            {
+                Some(key) => config.secret_key = Some(EncryptionKey(key)),
+                None => {
+                    config.secret_error =
+                        Some("FI_AI_SECRET_KEY 必須是 base64 編碼的 32 位元組金鑰".into())
+                }
+            }
+        }
+        if let Some(value) = var("FI_AI_ALLOWED_OLLAMA_ORIGINS") {
+            config.allowed_ollama_origins = value.split(',').filter_map(origin_of).collect();
+        }
+        config.auto_send_enabled = var("FI_AI_AUTO_SEND_ENABLED").is_some_and(|v| truthy(&v));
+        config.concurrency = var("FI_AI_CONCURRENCY")
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(2)
+            .clamp(1, 8);
+        config
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub bind: String,
@@ -45,6 +100,7 @@ pub struct Config {
     pub rate_limit: u32,
     /// 沒設定 `FI_SMTP_HOST` 就不寄信。
     pub smtp: Option<SmtpConfig>,
+    pub workflow: WorkflowConfig,
 }
 
 impl Config {
@@ -81,6 +137,7 @@ impl Config {
             trust_proxy: var("FI_TRUST_PROXY").is_some_and(|v| truthy(&v)),
             rate_limit: parse_var("FI_RATE_LIMIT", 10)?,
             smtp: smtp_from_env()?,
+            workflow: WorkflowConfig::from_env(),
         })
     }
 }

@@ -83,3 +83,49 @@ pub async fn integrations(
         json!({"format":q.format,"version":version.version,"endpoint":endpoint,"code":forms::snippets::generate(&q.format,&version,&endpoint)?}),
     ))
 }
+
+pub async fn identity_info(
+    State(s): State<AppState>,
+    _admin: Admin,
+    Path(id): Path<i64>,
+) -> AppResult<Json<Value>> {
+    let configured: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM identity_keys WHERE site_id=?)")
+            .bind(id)
+            .fetch_one(&s.db)
+            .await?;
+    Ok(Json(
+        json!({"configured":configured,"encryption_ready":s.config.workflow.secret_key.is_some(),"example":forms::identity::node_example(id)}),
+    ))
+}
+pub async fn rotate_identity(
+    State(s): State<AppState>,
+    Admin(u): Admin,
+    Path(id): Path<i64>,
+) -> AppResult<Json<Value>> {
+    forms::ensure_site(&s.db, id).await?;
+    Ok(Json(forms::identity::rotate(&s, id, u.id).await?))
+}
+pub async fn create_verification(
+    State(s): State<AppState>,
+    Admin(u): Admin,
+    Path(id): Path<i64>,
+) -> AppResult<Json<Value>> {
+    forms::ensure_site(&s.db, id).await?;
+    Ok(Json(
+        forms::identity::create_verification(&s, id, u.id).await?,
+    ))
+}
+pub async fn verification_status(
+    State(s): State<AppState>,
+    u: CurrentUser,
+    Path((id, session)): Path<(i64, i64)>,
+) -> AppResult<Json<Value>> {
+    ensure_visible(&s, &u, id).await?;
+    let row:Option<(i64,i64,Option<String>)>=sqlx::query_as("SELECT expires_at,received,last_received_at FROM verification_sessions WHERE id=? AND site_id=?").bind(session).bind(id).fetch_optional(&s.db).await?;
+    let (expires_at, received, last_received_at) =
+        row.ok_or_else(|| crate::error::AppError::not_found("找不到安裝測試"))?;
+    Ok(Json(
+        json!({"id":session,"expires_at":expires_at,"received":received,"last_received_at":last_received_at}),
+    ))
+}

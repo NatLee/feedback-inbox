@@ -42,6 +42,7 @@ impl TestApp {
             trust_proxy: false,
             rate_limit,
             smtp: None,
+            workflow: Default::default(),
         };
         let state = build_state(config).await.unwrap();
         Self {
@@ -1113,6 +1114,7 @@ async fn webhook_receiver(status: StatusCode) -> (String, Arc<Mutex<Vec<Value>>>
 
 /// 通知是在背景送的：等到結果寫進資料庫。
 async fn deliveries(t: &TestApp, admin: &Session, id: i64) -> Value {
+    while feedback_inbox::jobs::run_once(&t.state).await.unwrap() {}
     for _ in 0..100 {
         let detail = t.get(admin, &format!("/api/feedback/{id}")).await;
         if !detail["deliveries"].as_array().unwrap().is_empty() {

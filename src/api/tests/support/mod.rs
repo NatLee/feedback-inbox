@@ -32,6 +32,26 @@ impl TestApp {
     }
 
     pub async fn with_rate_limit(rate_limit: u32) -> Self {
+        Self::with_workflow(
+            rate_limit,
+            feedback_inbox::config::WorkflowConfig {
+                secret_key: Some(feedback_inbox::config::EncryptionKey([7; 32])),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+    pub async fn with_workflow(
+        rate_limit: u32,
+        workflow: feedback_inbox::config::WorkflowConfig,
+    ) -> Self {
+        Self::with_smtp(rate_limit, workflow, None).await
+    }
+    pub async fn with_smtp(
+        rate_limit: u32,
+        workflow: feedback_inbox::config::WorkflowConfig,
+        smtp: Option<feedback_inbox::config::SmtpConfig>,
+    ) -> Self {
         let dir = TempDir::new().unwrap();
         let config = Config {
             bind: "127.0.0.1:0".into(),
@@ -42,7 +62,8 @@ impl TestApp {
             cookie_secure: false,
             trust_proxy: false,
             rate_limit,
-            smtp: None,
+            smtp,
+            workflow,
         };
         let state = build_state(config).await.unwrap();
         Self {

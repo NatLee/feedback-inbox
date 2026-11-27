@@ -319,3 +319,96 @@ async fn exact_origins_errors_iframe_and_idempotency_are_separate_controls() {
     let (_, headers, _) = t.send(request("https://evil.example", "{}")).await;
     assert!(!headers.contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN));
 }
+
+fn signed_identity(secret: &str, site_id: i64, jti: &str, expires_delta: i64) -> String {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let now = chrono::Utc::now().timestamp();
+    let payload = json!({"v":1,"site_id":site_id,"sub":"member-42","email":"verified@example.com","email_verified":true,"iat":now,"exp":now+expires_delta,"jti":jti});
+    let encoded = URL_SAFE_NO_PAD.encode(payload.to_string());
+    let mut mac = Hmac::<Sha256>::new_from_slice(&URL_SAFE_NO_PAD.decode(secret).unwrap()).unwrap();
+    mac.update(encoded.as_bytes());
+    format!(
+        "{encoded}.{}",
+        URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
+    )
+}
+#[tokio::test]
+async fn identity_tokens_are_site_bound_expiring_and_single_use() {
+    let t = TestApp::new().await;
+    let admin = t.admin().await;
+    let site = t.site(&admin, json!({"name":"驗證身分"})).await;
+    let id = site["id"].as_i64().unwrap();
+    let key = site["key"].as_str().unwrap();
+    let signing = t
+        .ok(
+            &admin,
+            Method::POST,
+            &format!("/api/sites/{id}/identity-key/rotate"),
+            json!({}),
+        )
+        .await;
+    let secret = signing["secret"].as_str().unwrap();
+    let payload = |token: String| json!({"name":"會員","email":"verified@example.com","message":"需要資訊","_identity_token":token});
+    for token in [
+        signed_identity(secret, id + 1, "nonce-wrong-site-001", 300),
+        signed_identity(secret, id, "nonce-expired-000001", -120),
+        signed_identity(secret, id, "nonce-too-long-00001", 601),
+    ] {
+        assert_eq!(t.submit(key, payload(token)).await.0, StatusCode::FORBIDDEN);
+    }
+    let token = signed_identity(secret, id, "nonce-verified-00001", 300);
+    let mut body = payload(token);
+    body["_submission_id"] = json!("identity-retry-000001");
+    assert_eq!(t.submit(key, body.clone()).await.0, StatusCode::OK);
+    assert_eq!(t.submit(key, body.clone()).await.0, StatusCode::OK);
+    body.as_object_mut().unwrap().remove("_submission_id");
+    assert_eq!(t.submit(key, body).await.0, StatusCode::CONFLICT);
+    let stored: String = sqlx::query_scalar("SELECT identity_json FROM feedback")
+        .fetch_one(&t.state.db)
+        .await
+        .unwrap();
+    let identity: serde_json::Value = serde_json::from_str(&stored).unwrap();
+    assert_eq!(identity["subject"], "member-42");
+    assert_eq!(identity["email_verified"], true);
+    assert!(!stored.contains(secret));
+}
+#[tokio::test]
+async fn synthetic_receipts_are_bounded_and_excluded_from_ordinary_statistics() {
+    let t = TestApp::new().await;
+    let admin = t.admin().await;
+    let site = t.site(&admin, json!({"name":"安裝測試"})).await;
+    let id = site["id"].as_i64().unwrap();
+    let key = site["key"].as_str().unwrap();
+    let session = t
+        .ok(
+            &admin,
+            Method::POST,
+            &format!("/api/sites/{id}/verification-sessions"),
+            json!({}),
+        )
+        .await;
+    for _ in 0..5 {
+        assert_eq!(t.submit(key,json!({"name":"Test","email":"test@example.com","message":"synthetic","_test_token":session["token"]})).await.0,StatusCode::OK);
+    }
+    assert_eq!(t.submit(key,json!({"name":"Test","email":"test@example.com","message":"sixth","_test_token":session["token"]})).await.0,StatusCode::BAD_REQUEST);
+    let normal = t.get(&admin, "/api/feedback").await;
+    assert_eq!(normal["total"], 0);
+    let stats = t.get(&admin, "/api/stats").await;
+    assert_eq!(stats["by_status"]["new"], 0);
+    let site = t.get(&admin, &format!("/api/sites/{id}")).await;
+    assert_eq!(site["total"], 0);
+    let deliveries: i64 = sqlx::query_scalar("SELECT count(*) FROM deliveries")
+        .fetch_one(&t.state.db)
+        .await
+        .unwrap();
+    assert_eq!(deliveries, 0);
+    let status = t
+        .get(
+            &admin,
+            &format!("/api/sites/{id}/verification-sessions/{}", session["id"]),
+        )
+        .await;
+    assert_eq!(status["received"], 5);
+}
