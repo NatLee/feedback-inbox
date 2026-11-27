@@ -162,9 +162,14 @@ export function Layout() {
           <Brand />
         </div>
         <div className="flex-1 overflow-y-auto">
-          <p className="rail-label">YOUR WORKSPACE</p>
+          <p className="rail-label">MAILROOM / 工作分區</p>
           <SidebarNav />
           <div className="desk-note">
+            <span className="rail-issue" aria-hidden="true">
+              POST
+              <br />
+              ROOM.
+            </span>
             <span>每一封來信，</span>
             <strong>都值得好好回應。</strong>
             <p>
@@ -217,9 +222,9 @@ export function Layout() {
       <main className="min-w-0 flex-1">
         <div className="desk-topline">
           <span>
-            <span className="desk-live" /> TEAM INBOX
+            <span className="desk-live" /> CORRESPONDENCE REGISTER
           </span>
-          <span>把回應，放在心上。</span>
+          <span>來信有序，回應有心。</span>
         </div>
         <Outlet />
       </main>

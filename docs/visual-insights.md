@@ -1,6 +1,6 @@
 # Visual insights
 
-A correspondence triage desk: open-message age distribution, status ring, site workload and daily arrival calendar. Every visual links to a real filtered inbox. Rolling age is based on received time, not an SLA or response-time measure.
+A correspondence triage desk: open-message age distribution, status register, site workload and daily arrival calendar. Every visual links to a real filtered inbox. Rolling age is based on received time, not an SLA or response-time measure.
 
 Use existing React, React Router, CSS and SVG; inspected the existing query, hooks and routing APIs. No chart dependency is needed. Keep useful existing pages and administration workflows.
 
@@ -25,7 +25,7 @@ All drilldowns are ordinary links with shareable query parameters. Chart values 
 
 ## Data definitions
 
-`open_age` counts only `new` and `in_progress`: fresh < 24 hours, waiting ≥ 24 hours and < 7 days, overdue ≥ 7 days. The API key `overdue` is an age bucket, not a promised response deadline. Both list and export use the same predicate and validated sort. The status ring includes all non-spam messages, while its center reports open messages. Site bars compare absolute non-spam volumes against the largest site. The arrival calendar uses the browser's local days; rolling age uses UTC elapsed time. Counts can change as live time advances or records change.
+`open_age` counts only `new` and `in_progress`: fresh < 24 hours, waiting ≥ 24 hours and < 7 days, overdue ≥ 7 days. The API key `overdue` is an age bucket, not a promised response deadline. Both list and export use the same predicate and validated sort. The status register includes all non-spam messages, while its center reports open messages. Site bars compare absolute non-spam volumes against the largest site. The arrival calendar uses the browser's local days; rolling age uses UTC elapsed time. Counts can change as live time advances or records change.
 
 ## Reproduction and scope
 

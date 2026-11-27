@@ -13,131 +13,118 @@ export function TriageBoard({ data }: { data: Stats }) {
   const open = data.by_status.new + data.by_status.in_progress;
   const total = open + data.by_status.done;
   const statuses = [
-    {
-      key: "new",
-      title: "未處理",
-      value: data.by_status.new,
-      color: "#c44f32",
-    },
-    {
-      key: "in_progress",
-      title: "處理中",
-      value: data.by_status.in_progress,
-      color: "#ce9b47",
-    },
-    {
-      key: "done",
-      title: "已完成",
-      value: data.by_status.done,
-      color: "#6d8a73",
-    },
+    { key: "new", title: "未處理", value: data.by_status.new },
+    { key: "in_progress", title: "處理中", value: data.by_status.in_progress },
+    { key: "done", title: "已完成", value: data.by_status.done },
   ];
-  let offset = 0;
   return (
-    <section className="triage-board" aria-label="來信分流工作台">
-      <div className="triage-seal">
-        <span className="eyebrow">01 / THE OPEN LETTERS</span>
-        <h2>{open ? "每一封等待，都值得回應。" : "今天的等待，已經接住。"}</h2>
-        <div className="status-seal">
-          <svg
-            viewBox="0 0 200 200"
-            role="img"
-            aria-label={`未處理 ${data.by_status.new}、處理中 ${data.by_status.in_progress}、已完成 ${data.by_status.done} 則`}
-          >
-            <circle
-              cx="100"
-              cy="100"
-              r="82"
-              fill="none"
-              stroke="var(--desk-rule)"
-              strokeWidth="15"
-            />
-            {statuses.map((s) => {
-              const part = total ? (s.value / total) * 100 : 0;
-              const start = offset;
-              offset += part;
-              return (
-                <circle
-                  key={s.key}
-                  cx="100"
-                  cy="100"
-                  r="82"
-                  fill="none"
-                  stroke={s.color}
-                  strokeWidth="15"
-                  pathLength="100"
-                  strokeDasharray={`${part} ${100 - part}`}
-                  strokeDashoffset={-start}
-                  transform="rotate(-90 100 100)"
-                />
-              );
-            })}
-          </svg>
-          <div>
-            <strong>{open.toLocaleString()}</strong>
-            <span>封等待處理</span>
-            <small>共 {total.toLocaleString()} 封 · 不含垃圾</small>
-          </div>
+    <section className="correspondence-desk" aria-label="來信分流工作台">
+      <div className="desk-editorial">
+        <div className="desk-edition">
+          <span>THE CORRESPONDENCE DESK</span>
+          <span>來信處理編輯台 / 01</span>
         </div>
-        <div className="status-key">
-          {statuses.map((s) => (
+        <div className="editorial-copy">
+          <div>
+            <span className="eyebrow">LET EVERY VOICE BE HEARD</span>
+            <h2>
+              {open ? (
+                <>
+                  把等待，
+                  <br />
+                  變成回應。
+                </>
+              ) : (
+                <>
+                  每一封，
+                  <br />
+                  都有了回音。
+                </>
+              )}
+            </h2>
+            <p>
+              先接住等得最久的聲音。
+              <br />
+              從一封來信，開始今天的工作。
+            </p>
+          </div>
+          <Link to="/inbox?status=open&sort=oldest" className="open-postmark">
+            <span>WAITING TO BE HEARD</span>
+            <strong>{open.toLocaleString()}</strong>
+            <span>
+              封等待處理 <ArrowRight size={13} />
+            </span>
+          </Link>
+        </div>
+        <div
+          className="mail-status-register"
+          role="group"
+          aria-label={`未處理 ${data.by_status.new}、處理中 ${data.by_status.in_progress}、已完成 ${data.by_status.done} 則`}
+        >
+          {statuses.map((s, i) => (
             <Link key={s.key} to={`/inbox?status=${s.key}`}>
-              <i style={{ background: s.color }} />
-              <span>{s.title}</span>
-              <b>{s.value.toLocaleString()}</b>
-              <ArrowRight size={13} />
+              <small>
+                0{i + 1} / {s.title}
+              </small>
+              <strong>
+                {s.value.toLocaleString()}
+                <ArrowRight size={14} />
+              </strong>
             </Link>
           ))}
         </div>
+        <span className="register-foot">
+          收件登錄 {total.toLocaleString()} 封 · 不含垃圾訊息
+        </span>
       </div>
-      <div className="waiting-ledger">
-        <div className="insight-heading">
-          <div>
-            <span className="eyebrow">PRIORITY / 按等待時間</span>
-            <h3>先回應，等最久的人。</h3>
-          </div>
-          <Clock3 size={22} />
+      <div className="letter-sorting">
+        <div className="sorting-heading">
+          <span className="eyebrow">SORTED BY RECEIVED AGE</span>
+          <Clock3 size={17} />
         </div>
-        <p className="insight-caption">
-          只計未處理與處理中的訊息；從收到的時間開始計算。
-        </p>
-        <div className="age-lanes">
+        <h3>今天，先拆哪一封？</h3>
+        <p>收到至今的時間 · 僅待處理來信</p>
+        <div className="envelope-trays">
           {AGE_LANES.map((lane, i) => (
             <Link
               key={lane.key}
-              className={`age-lane age-${lane.key}`}
+              className={`sorting-envelope envelope-${lane.key}`}
               to={`/inbox?status=open&age=${lane.key}&sort=oldest`}
               aria-label={`${lane.title}：${data.open_age[lane.key]} 封，查看最舊來信`}
             >
-              <span className="lane-number">0{i + 1}</span>
-              <span className="lane-copy">
+              <div className="envelope-letter">
+                <span>TO: THE TEAM</span>
                 <b>{lane.title}</b>
                 <small>{lane.hint}</small>
-                <span className="lane-track">
-                  <span
-                    style={{
-                      width: `${open ? (data.open_age[lane.key] / open) * 100 : 0}%`,
-                    }}
-                  />
+              </div>
+              <div className="envelope-front">
+                <span className="envelope-index">
+                  0{i + 1}
+                  <small>RECEIVED</small>
                 </span>
-              </span>
-              <strong>{data.open_age[lane.key]}</strong>
-              <ArrowRight size={17} />
+                <strong>
+                  {data.open_age[lane.key]}
+                  <small>封</small>
+                </strong>
+                <span className="envelope-open">
+                  拆閱 <ArrowRight size={13} />
+                </span>
+              </div>
             </Link>
           ))}
         </div>
-        <div className="ledger-foot">
+        <div className="sorting-caption">
           {open ? (
             <>
-              <span>選擇一列，從最舊來信開始。</span>
+              <span>依收件時間分袋，從最舊開始閱讀。</span>
               <Link to="/inbox?status=open&sort=oldest">
-                查看全部待處理 <ArrowRight size={14} />
+                全部待處理 <ArrowRight size={13} />
               </Link>
             </>
           ) : (
             <>
-              <CheckCheck size={18} />
-              <span>沒有待處理的訊息。新來信會出現在這裡。</span>
+              <CheckCheck size={17} />
+              <span>沒有待處理訊息。新來信會出現在這裡。</span>
             </>
           )}
         </div>

@@ -99,7 +99,7 @@ function Notes({
   };
 
   return (
-    <section className="card">
+    <section className="handling-notes card">
       <h2 className="border-b border-zinc-100 px-4 py-3 text-sm font-semibold sm:px-5 dark:border-zinc-800">
         處理紀錄
       </h2>
@@ -334,9 +334,21 @@ export function FeedbackDetailPage() {
       {error && <ErrorBanner message={error} />}
       {!data && !error && <Loading />}
       {data && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
+        <div className="letter-workspace grid gap-4 lg:grid-cols-[1fr_18rem]">
           <div className="flex min-w-0 flex-col gap-4">
             <section className="message-paper card p-4 sm:p-5">
+              <div className="letter-letterhead">
+                <span>
+                  ORIGINAL CORRESPONDENCE
+                  <small>來信原文 / #{String(data.id).padStart(5, "0")}</small>
+                </span>
+                <span className="received-stamp">
+                  RECEIVED
+                  <small>
+                    {new Date(data.created_at).toLocaleDateString("zh-TW")}
+                  </small>
+                </span>
+              </div>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight">

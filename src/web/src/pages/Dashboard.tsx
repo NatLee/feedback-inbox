@@ -19,7 +19,7 @@ export function Dashboard() {
     <PageBody>
       <PageHeader
         title={`${user.display_name}，你好`}
-        subtitle="來信工作台 · 看見等待，再開始回應。"
+        subtitle="CORRESPONDENCE / 收件、分流、留下處理進度"
         actions={
           <Link to="/inbox" className="btn btn-secondary">
             打開收件匣 <ArrowRight size={15} />

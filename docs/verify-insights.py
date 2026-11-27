@@ -35,7 +35,8 @@ async def main():
         stats=await json_get("/api/stats?tz_offset=480")
         for age,label in [("overdue","已滿 7 天"),("waiting","1–7 天內"),("fresh","未滿 24 小時")]:
             await go("/")
-            await page.get_by_role("link",name=f"{label}：{stats['open_age'][age]} 封，查看最舊來信").click()
+            await page.get_by_role("link",name=f"{label}：{stats['open_age'][age]} 封，查看最舊來信").focus()
+            await page.keyboard.press("Enter")
             await expect(page.get_by_label("收到多久")).to_have_value(age)
             await expect(page.get_by_label("排序")).to_have_value("oldest")
             result=await json_get(f"/api/feedback?status=open&age={age}&sort=oldest")
