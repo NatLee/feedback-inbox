@@ -140,6 +140,10 @@ pub async fn prepare(
     };
     let schema: FormSchema =
         serde_json::from_str(&schema.ok_or_else(|| AppError::conflict("來源表單版本已停用"))?)?;
+    // Historical labels/values remain immutable, while current publication can tighten export permissions.
+    let current_schema: String = sqlx::query_scalar("SELECT v.schema_json FROM sites s JOIN form_versions v ON v.id=s.published_form_version_id WHERE s.id=?")
+        .bind(source.site_id).fetch_one(&mut *tx).await?;
+    let current_schema: FormSchema = serde_json::from_str(&current_schema)?;
     let values: Value = serde_json::from_str(&source.answers_json)?;
     let known = [
         (source.name.as_str(), "NAME"),
@@ -152,7 +156,14 @@ pub async fn prepare(
         if !settings.field_ids.contains(&field.id) {
             continue;
         }
-        if field.sensitivity == Sensitivity::Sensitive
+        let current_field = current_schema
+            .fields
+            .iter()
+            .find(|f| f.id == field.id)
+            .ok_or_else(|| AppError::conflict("來源欄位已從目前表單移除"))?;
+        if current_field.sensitivity == Sensitivity::Sensitive
+            || (current_field.sensitivity == Sensitivity::Personal && !settings.include_personal)
+            || field.sensitivity == Sensitivity::Sensitive
             || (field.sensitivity == Sensitivity::Personal && !settings.include_personal)
             || matches!(field.key.as_str(), "member_id" | "reply_requested")
         {

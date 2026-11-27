@@ -458,7 +458,14 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
         Arc,
     };
     for inflight in [false, true] {
-        for mutation in ["authority", "policy", "source", "knowledge", "provider"] {
+        for mutation in [
+            "authority",
+            "policy",
+            "source",
+            "knowledge",
+            "provider",
+            "field_permission",
+        ] {
             let entered = Arc::new(tokio::sync::Notify::new());
             let release = Arc::new(tokio::sync::Notify::new());
             let calls = Arc::new(AtomicUsize::new(0));
@@ -468,7 +475,7 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
                 async move {
                     let input: Value = serde_json::from_str(body["messages"][1]["content"].as_str().unwrap()).unwrap();
                     let output = if input.get("check").is_some() { json!({"ok":true}) } else {
-                        count.fetch_add(1, Ordering::SeqCst); seen.notify_one(); gate.notified().await;
+                        count.fetch_add(1, Ordering::SeqCst); seen.notify_one(); if inflight { gate.notified().await; }
                         let f = &input["fields"][0]; let text = f["text"].as_str().unwrap();
                         json!({"summary":"Fixture result","language":"en","category":input["categories"][0],"tags":[],"urgency":"normal","owner_id":null,"next_action":"Human review","missing_information":[],"risk_flags":[],"evidence":[{"field_id":f["field_id"],"start":0,"end":text.chars().count(),"quote":text}],"draft":{"subject":"Approved information","body":"Hours: weekdays.","knowledge_ids":[input["knowledge"][0]["id"]]}})
                     };
@@ -597,6 +604,33 @@ async fn changing_authority_policy_source_knowledge_or_provider_fences_model_egr
                         .execute(&app.state.db)
                         .await
                         .unwrap();
+                }
+                "field_permission" => {
+                    let form_path = format!("/api/sites/{sid}/form");
+                    let form = app.get(&admin, &form_path).await;
+                    let mut schema = form["draft"]["schema"].clone();
+                    let message = schema["fields"]
+                        .as_array_mut()
+                        .unwrap()
+                        .iter_mut()
+                        .find(|f| f["key"] == "message")
+                        .unwrap();
+                    message["sensitivity"] = json!("sensitive");
+                    let saved = app
+                        .ok(
+                            &admin,
+                            Method::PUT,
+                            &format!("{form_path}/draft"),
+                            json!({"expected_revision":form["draft"]["revision"],"schema":schema}),
+                        )
+                        .await;
+                    app.ok(
+                        &admin,
+                        Method::POST,
+                        &format!("{form_path}/publish"),
+                        json!({"expected_revision":saved["revision"]}),
+                    )
+                    .await;
                 }
                 "provider" => {
                     sqlx::query("UPDATE ai_providers SET enabled=0,revision=revision+1 WHERE id=?")

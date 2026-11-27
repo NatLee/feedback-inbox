@@ -100,10 +100,28 @@ export function Dialog({
   close.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close.current();
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () => Array.from(ref.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { e.preventDefault(); close.current(); }
+      if (e.key !== "Tab") return;
+      const items = focusable();
+      const first = items[0], last = items.at(-1);
+      if (!first || !last) return;
+      if (e.shiftKey && (document.activeElement === first || !ref.current?.contains(document.activeElement))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !ref.current?.contains(document.activeElement))) {
+        e.preventDefault(); first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    ref.current?.querySelector<HTMLElement>("input, textarea, button")?.focus();
-    return () => window.removeEventListener("keydown", onKey);
+    focusable()[0]?.focus();
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (previous?.isConnected) previous.focus();
+    };
   }, [open]);
   if (!open) return null;
   return (
