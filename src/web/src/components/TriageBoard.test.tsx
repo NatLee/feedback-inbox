@@ -18,7 +18,7 @@ test("triage uses non-spam counts and links to the exact age queue", () => {
       <TriageBoard data={stats} />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("img")).toHaveAccessibleName(
+  expect(screen.getByRole("group")).toHaveAccessibleName(
     "未處理 3、處理中 2、已完成 5 則",
   );
   expect(

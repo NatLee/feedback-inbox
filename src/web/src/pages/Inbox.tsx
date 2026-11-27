@@ -138,7 +138,7 @@ export function InboxPage() {
     <PageBody>
       <PageHeader
         title="收件匣"
-        subtitle="來自每個網站的聲音，集中在這裡好好回應。"
+        subtitle="INCOMING MAIL / 依來源與收件時間，整理每一個聲音。"
         actions={
           <a
             className="btn btn-secondary"
@@ -309,7 +309,7 @@ export function InboxPage() {
                 : "表單一有人送出，就會出現在這裡。"}
             </Empty>
           ) : (
-            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <ul className="mail-register divide-y divide-zinc-100 dark:divide-zinc-800">
               {items.map((item) => (
                 <li
                   key={item.id}
@@ -354,7 +354,7 @@ export function InboxPage() {
                         {item.preview || "（沒有內容）"}
                       </span>
                       <span className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        {item.site_name}
+                        <span className="mail-routing">{item.site_name}</span>
                         {item.note_count > 0 && (
                           <span
                             className="inline-flex items-center gap-0.5"
