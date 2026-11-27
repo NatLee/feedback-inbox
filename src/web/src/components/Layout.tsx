@@ -1,5 +1,6 @@
 import {
   Globe,
+  KeyRound,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -28,6 +29,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "總覽", icon: LayoutDashboard, end: true },
   { to: "/inbox", label: "收件匣", icon: Inbox },
   { to: "/sites", label: "網站", icon: Globe },
+  { to: "/connections", label: "連線與存取", icon: KeyRound },
   { to: "/settings", label: "設定", icon: Settings },
 ];
 

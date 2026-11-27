@@ -8,6 +8,7 @@ use crate::{auth::LoginLimiter, config::Config, notify::Mailer, ratelimit::RateL
 pub type AppState = Arc<Inner>;
 
 pub struct Inner {
+    pub access: std::sync::OnceLock<access_kit::AccessKit>,
     pub db: SqlitePool,
     pub config: Config,
     pub limiter: LoginLimiter,
@@ -28,6 +29,7 @@ impl Inner {
             .user_agent(concat!("feedback-inbox/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {
+            access: std::sync::OnceLock::new(),
             db,
             submissions: RateLimiter::new(config.rate_limit, Duration::from_secs(60)),
             config,

@@ -3,7 +3,6 @@ use feedback_inbox::{app, auth, build_state, demo, Config};
 use std::net::SocketAddr;
 
 use tokio::net::TcpListener;
-use tracing_subscriber::EnvFilter;
 
 const USAGE: &str = "用法：
   feedback-inbox                          啟動伺服器
@@ -15,11 +14,7 @@ const USAGE: &str = "用法：
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,sqlx=warn")),
-        )
-        .init();
+    feedback_inbox::logging::init();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {

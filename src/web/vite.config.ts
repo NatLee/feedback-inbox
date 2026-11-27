@@ -11,6 +11,9 @@ export default defineConfig({
   server: {
     // Preserve the browser Host so the API same-origin guard accepts dev writes.
     proxy: {
+      "/oauth": { target: apiTarget, changeOrigin: false },
+      "/.well-known": { target: apiTarget, changeOrigin: false },
+      "/mcp": { target: apiTarget, changeOrigin: false },
       "/api": { target: apiTarget, changeOrigin: false },
       "^/f(?:/|$)": { target: apiTarget, changeOrigin: false },
     },
