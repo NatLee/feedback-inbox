@@ -1,0 +1,46 @@
+{
+  "source_commit": "179193fb7f027b60729b7b7cc5028939bffa4b82",
+  "verified_at": "2026-11-27T19:02:48.389361+00:00",
+  "images": {
+    "api": {
+      "id": "sha256:782f28a0831e485d7a4deed28c7cc6d8499df5d80806984ba4cf6db490d2485b",
+      "user": "app",
+      "created": "2026-11-28T03:01:42.353240016+08:00"
+    },
+    "web": {
+      "id": "sha256:d00ead1323f2ce2575e964f0a401233e1ddb7e3363cc47531d77a5caf76697b3",
+      "user": "",
+      "created": "2026-11-28T02:58:51.988035607+08:00"
+    },
+    "standalone": {
+      "id": "sha256:8a96850c9995bdf42e5cb4b2fed109357193e12c3ba4ea81b432f6e48e38f64b",
+      "user": "app",
+      "created": "2026-11-28T03:02:09.372075+08:00"
+    }
+  },
+  "http_checks": {
+    "compose": {
+      "health": 200,
+      "spa_deep_link": 200,
+      "setup_required_on_fresh_database": true
+    },
+    "standalone": {
+      "health": 200,
+      "spa_deep_link": 200,
+      "setup_required_on_fresh_database": true
+    }
+  },
+  "runtime_uid": 10001,
+  "standalone_uid": 10001,
+  "api_public_ports": false,
+  "fixture_only": true,
+  "remote_ci": "https://github.com/NatLee/feedback-inbox/actions/runs/46052499597",
+  "cleanup": {
+    "at": "2026-11-27T19:04:24.534863+00:00",
+    "owned_containers_removed": true,
+    "owned_volume_removed": true,
+    "owned_network_removed": true,
+    "standalone_tmpfs_removed": true,
+    "obsolete_owned_images_removed": 4
+  }
+}

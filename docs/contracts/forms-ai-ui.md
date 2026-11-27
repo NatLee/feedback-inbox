@@ -63,6 +63,10 @@ Create/update/approve/retire paths mirror knowledge. Template body accepts only 
 `POST /ai/outbound/:id/reconcile` admin body `{resolution:'confirmed_sent'|'confirmed_not_sent',note}` → Outbound; explicit audit record, no automatic send.
 `GET /ai/review` → `{items:[{feedback_id,site_id,site_name,sender,created_at,draft_state,run_state,outbound_state,fallback_reason}]}` site-scoped queue. Link actual feedback detail. No bulk send.
 
+## Work records and filters
+
+`GET /sites/:id/ai/jobs` returns the latest 100 safe job records `{id,kind,state,attempt,error_code,created_at}` for a visible site; no job payload or credentials. Inbox query adds `category`, `urgency`, `review_only`, `test_only`; ordinary mode excludes test rows. Publication advances the draft revision as well as the immutable version.
+
 ## UI ownership and visual direction
 
 Frontend worker owns only `src/web/src` plus frontend tests and docs/screenshots. Backend worker owns Rust/migrations/operations. Add provider controls to existing Settings, AI tab to SiteDetail, analysis + distinct customer reply section to FeedbackDetail, review queue route/navigation. Reuse cream paper/vermilion editorial correspondence styling, calm stamped state labels, clear exact recipient, no decorative futuristic AI styling. Responsive, accessible labels, keyboard focus and meaningful empty/error states. Add tests for provider secret retention, explicit enable/test, member-only view, draft edits invalidating approval, unknown delivery display, actual synthetic receipt polling and no auto-send on render.

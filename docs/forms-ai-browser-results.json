@@ -1,0 +1,12 @@
+{
+  "site_id": 1,
+  "human_feedback_id": 1,
+  "automatic_feedback_id": 2,
+  "human_mail_count": 1,
+  "automatic_mail_count": 1,
+  "staff_mail_count_before_iframe": 2,
+  "browser_errors": [],
+  "screenshots": "docs/images/forms-ai-*.png",
+  "fixture_provider": "Ollama protocol; no real model",
+  "mail_transport": "Mailpit only"
+}

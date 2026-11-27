@@ -1,6 +1,24 @@
 # Versioned forms and reviewed AI correspondence
 
-Status: implementation design. OpenAI **Platform API keys**, Claude API, and local Ollama are the confirmed provider choices. This document records implementation decisions under the product direction in [the cross-product design](../../../../design-notes/2026-11-28-product-evolution-design.md); it does not claim separate user approval of every technical choice. No production data, paid inference, or external customer messages are used for verification.
+Status: implementation design. OpenAI **Platform API keys**, Claude API, and local Ollama are the confirmed provider choices. This document records implementation decisions under the shared product direction established during planning; it does not claim separate user approval of every technical choice. No production data, paid inference, or external customer messages are used for verification.
+
+## Implemented contract resolution
+
+The following implementation decisions supersede differing provisional DTO names or numbers later in this design. The exact supported routes/fields are [the API contract](../../contracts/forms-ai-ui.md); user/operator behavior is [the guide](../../forms-ai.md). This resolution keeps the complete form → analysis → review → human send / controlled template send flow, while making the shipped boundaries explicit.
+
+- Draft save **and publication** advance the optimistic draft revision. Duplicate publication of the same expected revision returns 409. Public validation errors identify the offending field in a banner and preserve safe posted values; no separate per-control error-map contract is exposed.
+- Embed POST uses the dedicated `/embed` action, without a client-controlled `_display` switch. Standalone and embed result/error headers stay separate.
+- Provider mutation is `PUT`; stopping a provider disables its retained configuration rather than deleting historical references. Returned fields are `has_credential`, `revision`, `tested_revision`, `last_test_error`; no secret suffix is exposed. Stored credential envelope version is inside ciphertext. Synthetic tests prove the selected model's schema behavior; the UI does not claim detailed per-stage latency diagnostics.
+- Site AI uses `field_ids`, `include_personal`, categories/tags, `daily_attempt_limit`, `timeout_seconds`, `max_output_tokens`, `generate_on_receipt`, and separate `auto_mode`. Private notes are **always excluded**. Language is inferred; arbitrary prompt/policy editing and explicit language override are outside this release. Approved plain-text knowledge carries reply facts/policies instead.
+- Categories and tags each have at most 30 configured strings. Output allows at most 10 tags, urgency `low|normal|high`, 1–20 Unicode-scalar evidence ranges, language ≤40, next action ≤1,000, at most 10 missing-information strings. Risk enum is `security|privacy|legal|billing|abuse|self_harm|uncertain|prompt_injection`. The full machine schema is `ai::analysis::schema()`.
+- Up to 50 active knowledge entries and 50 active templates per site, title/name ≤120, body ≤10,000. Each edit inserts an immutable revision and retires its predecessor. The latest **five currently approved** knowledge revisions are included, within the shared 20,000-character cap; no per-run knowledge selector. Historical form values are additionally checked against the **current** publication's field sensitivity/removal so a later restriction fences old feedback too.
+- Analysis stores a redacted immutable input, its hash, provider/policy revisions, knowledge IDs, source hash, output/usage and actual status. No extra raw prompt copy. Current run, proposal, draft and outbound state names are those in the API contract, not the earlier illustrative names below.
+- Durable table is `workflow_jobs`, kinds `analysis|reply|notify_email|notify_webhook`; jitter 0–2 seconds. Work records show latest 100 jobs. Manual regeneration creates a fresh analysis; there is no arbitrary dead-letter replay UI. A lost pre-transmission reply claim can retry, while `sending` recovers to `delivery_unknown` and never auto-retries. Unknown reconciliation requires an administrator's explanation, saved as an internal note and hashed in the append-only audit.
+- One rule matches one exact published select value plus one configured category and one approved template revision. At most 20 rules; multiple matches fall back to review. Template interpolation is restricted to `site_name`, `reference`, `category`. With no knowledge reference, only the exact standard acknowledgement preset is allowed; every other template requires approved knowledge.
+- Automatic eligibility also requires no human-origin/rejected draft, no missing information and no high urgency. Daily/recipient reservations are **not refunded** on cancellation/failure. Activation/resumption records a feedback-ID high-water mark as well as time, excluding same-second historical records.
+- Activation/pause is one revision-checked site settings save. The UI has a dedicated explicit enable action, separate generation/send controls, template approval and rule/dry-run pages. Missing signing key/consent/rule configuration makes sends ineligible and is shown by the dry run; activation itself does not demand artificial fixture confirmation. No freeform AI output can auto-send.
+
+The original detailed design below records rationale and remains applicable except where this resolution or the exact API contract differs. Verification receipts distinguish source tests, protocol fixtures, real Mailpit, and browser checks; they do not claim live paid model validation.
 
 ## Outcome and boundaries
 
@@ -193,6 +211,6 @@ Acceptance runs on disposable legacy DB copies and a real two-origin browser fix
 - [OpenAI structured model outputs](https://developers.openai.com/api/docs/guides/structured-outputs): Responses structured output and refusal/incomplete handling.
 - [Claude structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs): `output_config.format` and schema limitations.
 - [Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs): local `/api/chat` schema format; cloud support is not assumed.
-- [OpenAI authentication](https://learn.chatgpt.com/docs/auth): API keys are distinct from ChatGPT/Codex login sessions.
+- [OpenAI authentication](https://developers.openai.com/api/reference/overview#authentication): API keys are distinct from ChatGPT/Codex login sessions.
 
 Provider models and capability claims are tested against the selected deployment configuration; no fixed model name or availability claim is baked into this design.
