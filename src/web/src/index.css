@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./mail-motion.css";
 
 /* 深色模式看 <html class="dark">，由 lib/theme.ts 依使用者的選擇切換。 */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -23,11 +24,11 @@
   --color-brand-900: #60291f;
   --color-brand-950: #34130e;
 
-  --shadow-soft:
-    0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -12px rgb(15 23 42 / 0.12);
 }
 
 @layer base {
+  b, strong, h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+  .lucide { stroke-width: 1.5; }
   html {
     color-scheme: light;
   }
@@ -45,13 +46,13 @@
 
 @layer components {
   .card {
-    @apply rounded-lg border border-zinc-200/80 bg-white shadow-soft dark:border-zinc-800 dark:bg-zinc-900;
+    @apply rounded-lg border border-zinc-200/80 bg-white  dark:border-zinc-800 dark:bg-zinc-900;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700 dark:bg-brand-500 dark:text-zinc-950 dark:hover:bg-brand-400;
+    @apply bg-brand-600 text-white  hover:bg-brand-700 dark:bg-brand-500 dark:text-zinc-950 dark:hover:bg-brand-400;
   }
   .btn-secondary {
     @apply border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800;
@@ -66,19 +67,19 @@
     @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 focus:outline-none disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300;
+    @apply mb-1 block text-sm font-semibold text-zinc-700 dark:text-zinc-300;
   }
   .hint {
     @apply mt-1 text-xs text-zinc-500 dark:text-zinc-400;
   }
   .kbd {
-    @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-zinc-300 bg-zinc-50 px-1 font-mono text-[11px] leading-none text-zinc-500 shadow-[inset_0_-1px_0] shadow-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:shadow-zinc-700;
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded border border-zinc-300 bg-zinc-50 px-1 font-mono text-[11px] leading-none text-zinc-500  dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 ;
   }
   .th {
     @apply px-3 py-2 text-left text-xs font-semibold tracking-wide text-zinc-500 dark:text-zinc-400;
   }
   .td {
-    @apply px-3 py-2.5 align-top text-sm;
+    @apply px-3 py-3 align-top text-sm;
   }
 }
 
@@ -132,12 +133,12 @@ h1,
   min-width: 0;
   background-color: var(--desk-paper);
   border-color: var(--desk-rule);
-  box-shadow: 0 3px 0 -1px color-mix(in srgb, var(--desk-rule) 50%, transparent);
+  box-shadow: none;
 }
 .desk-rail {
   background-color: #eee6d9;
   border-right: 1px solid #d7c9b8;
-  padding: 30px 20px 20px;
+  padding: 32px 20px 20px;
 }
 .dark .desk-rail {
   background: #241d18;
@@ -153,28 +154,28 @@ h1,
     serif;
 }
 .brand > span > span:last-child {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
 }
 .rail-label {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.19em;
   color: var(--color-zinc-500);
-  margin: 18px 10px 12px;
+  margin: 20px 12px 12px;
 }
 .desk-nav-link {
-  padding: 12px 14px;
-  margin-bottom: 5px;
+  padding: 12px 16px;
+  margin-bottom: 4px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 4px;
 }
 .desk-nav-link[aria-current="page"] {
   background: #b5412b;
   color: #fff9f3;
-  box-shadow: 0 5px 14px #96352222;
+  box-shadow: none;
 }
 .desk-note {
-  margin: 40px 9px 20px;
+  margin: 40px 8px 20px;
   padding: 20px 0;
   border-top: 1px solid var(--desk-rule);
   color: var(--desk-ink);
@@ -187,7 +188,7 @@ h1,
   line-height: 1.6;
 }
 .desk-note p {
-  margin: 14px 0 18px;
+  margin: 16px 0 20px;
   font-size: 12px;
   line-height: 1.9;
   color: var(--color-zinc-500);
@@ -206,7 +207,7 @@ h1,
   align-items: center;
   padding: 0 40px;
   border-bottom: 1px solid var(--desk-rule);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--color-zinc-500);
 }
@@ -223,31 +224,31 @@ h1,
 }
 .eyebrow {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.19em;
   font-weight: 600;
 }
 .mail-folders {
   gap: 0;
   border-bottom: 1px solid var(--desk-rule);
-  padding: 0 2px;
+  padding: 0 4px;
 }
 .mail-folders button {
-  border-radius: 5px 5px 0 0;
-  padding: 12px 17px;
+  border-radius: 4px 4px 0 0;
+  padding: 12px 16px;
   font-size: 12px;
 }
 .mail-tools {
   box-shadow: none;
   border: 0;
-  padding: 10px 0;
+  padding: 12px 0;
   background: transparent;
 }
 .mail-list {
   border-top: 3px solid var(--color-brand-600);
 }
 .mail-row {
-  padding: 20px 18px;
+  padding: 20px 20px;
   align-items: center;
 }
 .mail-row:nth-child(even) {
@@ -282,22 +283,22 @@ h1,
 .login-story {
   background: #a9402c;
   color: #fff4e4;
-  padding: 60px 12%;
+  padding: 60px 48px;
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 .login-story .eyebrow {
   opacity: 0.7;
-  margin-bottom: 50px;
+  margin-bottom: 52px;
 }
 .login-envelope {
   width: min(100%, 320px);
-  padding: 30px;
+  padding: 32px;
   margin: 0 auto 40px;
   color: #7a3828;
   background: #f6e5cc;
-  box-shadow: 12px 15px 0 #702b2244;
+  box-shadow: none;
   transform: rotate(-5deg);
   border-bottom: 6px double #b98a66;
 }
@@ -311,10 +312,10 @@ h1,
   font:
     30px/1.4 "Songti TC",
     serif;
-  margin: 22px 0;
+  margin: 24px 0;
 }
 .login-envelope small {
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.2em;
 }
 .login-story h2 {
@@ -329,34 +330,34 @@ h1,
   opacity: 0.8;
 }
 .login-form-wrap {
-  padding: 40px 25px;
+  padding: 40px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
 }
 .login-form-wrap form {
-  padding: 35px;
+  padding: 36px;
   border: 0;
   box-shadow: none;
   background: transparent;
 }
 .login-footer {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--color-zinc-500);
   text-align: center;
-  margin-top: 25px;
+  margin-top: 24px;
 }
 
 @media (max-width: 639px) {
   .desk-topline {
-    padding: 0 18px;
+    padding: 0 20px;
     height: 37px;
-    font-size: 8px;
+    font-size: 11px;
   }
   .mail-row {
-    padding: 16px 10px;
+    padding: 16px 12px;
     gap: 8px;
     align-items: flex-start;
   }
@@ -364,7 +365,7 @@ h1,
     display: none;
   }
   .mail-folders button {
-    padding: 11px;
+    padding: 12px;
   }
   .mail-tools > div {
     max-width: 100%;
@@ -380,7 +381,7 @@ h1,
     padding: 32px;
   }
   .login-story .eyebrow {
-    margin-bottom: 22px;
+    margin-bottom: 24px;
   }
   .login-envelope {
     display: none;
@@ -389,10 +390,10 @@ h1,
     font-size: 30px;
   }
   .login-story > p {
-    margin-top: 10px;
+    margin-top: 12px;
   }
   .login-form-wrap {
-    padding: 22px 12px 40px;
+    padding: 24px 12px 40px;
   }
   .login-form-wrap form {
     padding: 20px;
@@ -420,7 +421,7 @@ h1,
 /* A working correspondence desk: visual queues, receipt calendar, workload ledger. */
 .triage-layout {
   display: grid;
-  gap: 22px;
+  gap: 24px;
 }
 
 .insight-heading {
@@ -433,26 +434,26 @@ h1,
   font-family: "Iowan Old Style", "Songti TC", serif;
   font-size: 22px;
   font-weight: 600;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 .insight-caption {
   color: var(--color-zinc-500);
   font-size: 11px;
   line-height: 1.8;
-  margin: 10px 0 17px;
+  margin: 12px 0 16px;
 }
 
 .triage-secondary {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
-  gap: 22px;
+  gap: 24px;
 }
 .arrival-calendar,
 .site-workload {
-  padding: 23px;
+  padding: 24px;
 }
 .calendar-total {
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
   color: var(--color-zinc-500);
 }
@@ -464,7 +465,7 @@ h1,
 .arrival-grid {
   display: grid;
   grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 5px;
+  gap: 4px;
 }
 .arrival-cell {
   min-height: 58px;
@@ -472,16 +473,16 @@ h1,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   border: 1px solid color-mix(in srgb, var(--desk-rule) 70%, transparent);
-  border-radius: 3px;
+  border-radius: 4px;
   transition: transform 0.15s;
 }
 .arrival-cell:hover {
   transform: translateY(-3px);
 }
 .arrival-cell span {
-  font-size: 8px;
+  font-size: 11px;
 }
 .arrival-cell strong {
   font-size: 14px;
@@ -529,31 +530,31 @@ h1,
   color: #351a0c;
 }
 .calendar-footer {
-  margin-top: 18px;
+  margin-top: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--color-zinc-500);
 }
 .calendar-legend {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
 }
 .calendar-legend i {
   display: block;
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: 0px;
 }
 .workload-filter {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10px;
+  gap: 4px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .workload-filter input {
@@ -562,10 +563,10 @@ h1,
 .workload-legend {
   display: flex;
   justify-content: flex-end;
-  gap: 13px;
-  font-size: 9px;
+  gap: 12px;
+  font-size: 11px;
   color: var(--color-zinc-500);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .workload-legend span {
   display: flex;
@@ -583,8 +584,8 @@ h1,
 .workload-row {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 17px 0;
+  gap: 12px;
+  padding: 16px 0;
   border-bottom: 1px solid var(--desk-rule);
 }
 .workload-row > div {
@@ -609,14 +610,14 @@ h1,
   white-space: nowrap;
 }
 .workload-name span {
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
   color: var(--color-zinc-500);
 }
 .workload-bar {
   display: flex;
   height: 9px;
-  margin-top: 10px;
+  margin-top: 12px;
   background: var(--color-zinc-100);
 }
 .workload-bar i {
@@ -632,19 +633,19 @@ h1,
 .workload-manage {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 10px;
-  margin-top: 17px;
+  gap: 4px;
+  font-size: 11px;
+  margin-top: 16px;
   color: var(--color-zinc-500);
 }
 .workload-empty {
   font-size: 12px;
   line-height: 1.8;
-  padding: 26px 0;
+  padding: 28px 0;
   color: var(--color-zinc-500);
 }
 .recent-heading {
-  padding: 22px;
+  padding: 24px;
   border-bottom: 1px solid var(--desk-rule);
 }
 .insight-loading {
@@ -660,7 +661,7 @@ h1,
   background: var(--desk-rule);
   opacity: 0.35;
   min-height: 180px;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 .insight-loading div:first-of-type {
   grid-column: 1/-1;
@@ -725,7 +726,7 @@ body {
 }
 .desk-rail {
   width: 220px;
-  padding: 32px 18px 20px;
+  padding: 32px 20px 20px;
   background: #e9e1d3;
 }
 .desk-rail .brand {
@@ -742,16 +743,16 @@ body {
 }
 .desk-nav-link[aria-current="page"] {
   background: #bd422e;
-  box-shadow: 4px 4px 0 #8c302f24;
+  box-shadow: none;
 }
 .desk-note {
-  margin: 34px 6px 20px;
+  margin: 36px 8px 20px;
   border: 0;
   padding-top: 0;
 }
 .desk-note .rail-issue {
   font:
-    700 48px/0.92 Georgia,
+    600 48px/0.92 Georgia,
     serif;
   letter-spacing: -0.075em;
   color: #ba432f;
@@ -768,7 +769,7 @@ body {
   height: 42px;
   border-bottom: 1px solid var(--desk-rule);
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
 }
 .page-body {
   max-width: 1520px;
@@ -776,7 +777,7 @@ body {
 .card,
 .btn,
 .input {
-  border-radius: 3px;
+  border-radius: 4px;
 }
 .correspondence-desk {
   display: grid;
@@ -788,7 +789,7 @@ body {
   position: relative;
   background: #bd422e;
   color: #fff3df;
-  padding: 25px 30px 20px;
+  padding: 24px 32px 20px;
   overflow: hidden;
 }
 .desk-editorial::after {
@@ -803,22 +804,22 @@ body {
   position: relative;
   z-index: 1;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: space-between;
-  font: 8px/1.5 var(--font-mono);
+  font: 11px/1.5 var(--font-mono);
   letter-spacing: 0.06em;
-  padding-bottom: 15px;
+  padding-bottom: 16px;
   border-bottom: 1px solid #f2beab66;
 }
 .editorial-copy {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 30px 0 24px;
+  gap: 12px;
+  padding: 32px 0 24px;
 }
 .editorial-copy .eyebrow {
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.13em;
   opacity: 0.8;
 }
@@ -828,7 +829,7 @@ body {
     "Iowan Old Style",
     serif;
   letter-spacing: -0.045em;
-  margin: 12px 0 17px;
+  margin: 12px 0 16px;
 }
 .editorial-copy p {
   font-size: 11px;
@@ -856,14 +857,14 @@ body {
   margin: 8px 0;
 }
 .open-postmark > span {
-  font: 7px var(--font-mono);
+  font: 11px var(--font-mono);
   letter-spacing: 0.1em;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 .open-postmark > span:last-child {
-  font: 10px var(--font-sans);
+  font: 11px var(--font-sans);
 }
 .mail-status-register {
   display: flex;
@@ -872,7 +873,7 @@ body {
 }
 .mail-status-register a {
   flex: 1;
-  padding: 16px 13px 14px;
+  padding: 16px 12px 16px;
   border-right: 1px solid #f2beab66;
 }
 .mail-status-register a:first-child {
@@ -882,13 +883,13 @@ body {
   border: 0;
 }
 .mail-status-register small {
-  font-size: 9px;
+  font-size: 11px;
 }
 .mail-status-register strong {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: 8px;
   font:
     32px Georgia,
     serif;
@@ -899,13 +900,13 @@ body {
 }
 .register-foot {
   display: block;
-  font-size: 9px;
-  padding-top: 13px;
+  font-size: 11px;
+  padding-top: 12px;
   opacity: 0.8;
 }
 .letter-sorting {
   background: #e9dfce;
-  padding: 25px 30px 18px;
+  padding: 24px 32px 20px;
   min-width: 0;
 }
 .sorting-heading {
@@ -915,24 +916,24 @@ body {
   color: #8c4433;
 }
 .sorting-heading .eyebrow {
-  font-size: 8px;
+  font-size: 11px;
 }
 .letter-sorting h3 {
   font:
     600 26px "Songti TC",
     serif;
   color: #493c32;
-  margin: 14px 0 8px;
+  margin: 16px 0 8px;
 }
 .letter-sorting > p {
-  font-size: 10px;
+  font-size: 11px;
   color: #7b6c5b;
 }
 .envelope-trays {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: end;
-  margin: 35px -2px 24px;
+  margin: 36px -4px 24px;
 }
 .sorting-envelope {
   position: relative;
@@ -955,11 +956,11 @@ body {
   left: 7px;
   right: 7px;
   bottom: 12px;
-  padding: 17px 12px;
+  padding: 16px 12px;
   background: #fffcf3;
   color: #574937;
   border: 1px solid #d5c4ad;
-  box-shadow: 0 3px 8px #5b3b2020;
+  box-shadow: none;
   transform: rotate(-3deg);
 }
 .envelope-waiting .envelope-letter {
@@ -972,23 +973,23 @@ body {
 }
 .envelope-letter > span {
   display: block;
-  font: 7px var(--font-mono);
+  font: 11px var(--font-mono);
   color: #897967;
   border-bottom: 1px solid #d7c7b5;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 .envelope-letter b {
   display: block;
   font:
     600 19px/1.5 "Songti TC",
     serif;
-  margin-top: 9px;
+  margin-top: 8px;
 }
 .envelope-letter small {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.7;
   display: block;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 .envelope-front {
   position: absolute;
@@ -996,7 +997,7 @@ body {
   left: 0;
   right: 0;
   height: 110px;
-  padding: 27px 12px 12px;
+  padding: 28px 12px 12px;
   color: #863b2c;
   background:
     linear-gradient(28deg, transparent 49.3%, #cfb99f 50%, transparent 50.6%)
@@ -1006,8 +1007,7 @@ body {
     #e1c9ac;
   border: 1px solid #c6ac8c;
   box-shadow:
-    0 5px 0 -2px #c2ae91,
-    0 10px 13px #6e4f2d19;
+    none;
   clip-path: polygon(0 0, 50% 14%, 100% 0, 100% 100%, 0 100%);
 }
 .envelope-overdue .envelope-front {
@@ -1027,8 +1027,8 @@ body {
   top: 24px;
 }
 .envelope-front strong small {
-  font: 9px var(--font-sans);
-  margin-left: 3px;
+  font: 11px var(--font-sans);
+  margin-left: 4px;
 }
 .envelope-index {
   display: block;
@@ -1038,7 +1038,7 @@ body {
 }
 .envelope-index small {
   display: block;
-  font: 6px var(--font-mono);
+  font: 11px var(--font-mono);
   margin-top: 4px;
   letter-spacing: 0.1em;
 }
@@ -1046,16 +1046,16 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 8px;
-  margin-top: 13px;
+  font-size: 11px;
+  margin-top: 12px;
 }
 .sorting-caption {
   display: flex;
   justify-content: space-between;
   gap: 8px;
   border-top: 1px solid #cbbca6;
-  padding-top: 14px;
-  font-size: 9px;
+  padding-top: 16px;
+  font-size: 11px;
   color: #756651;
 }
 .sorting-caption a {
@@ -1092,7 +1092,7 @@ body {
 }
 .mail-folders {
   margin-top: 24px;
-  gap: 6px;
+  gap: 8px;
 }
 .mail-folders button {
   border-radius: 0;
@@ -1132,7 +1132,7 @@ body {
   border-radius: 0;
   color: #75503a;
   font-size: 22px;
-  box-shadow: inset 0 0 0 3px #f9eedb;
+  box-shadow: none;
 }
 .mail-register .mail-row a > span:nth-child(2) > span:first-child {
   white-space: normal;
@@ -1144,12 +1144,12 @@ body {
 }
 .mail-routing {
   display: inline-block;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.03em;
   color: #9c5037;
   margin-top: 4px;
   border-bottom: 1px solid #c7aa8e;
-  padding: 2px 0;
+  padding: 4px 0;
 }
 .dark .mail-routing {
   color: #efb296;
@@ -1157,7 +1157,7 @@ body {
 .message-paper {
   border: 1px solid var(--desk-rule);
   border-top: 0;
-  padding: 30px !important;
+  padding: 32px;
   background-image: linear-gradient(
     135deg,
     #c34530 25%,
@@ -1175,22 +1175,22 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0 28px;
+  padding: 12px 0 28px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--desk-rule);
   color: #946d54;
-  font: 8px var(--font-mono);
+  font: 11px var(--font-mono);
   letter-spacing: 0.12em;
 }
 .letter-letterhead > span > small {
   display: block;
-  font: 10px var(--font-sans);
+  font: 11px var(--font-sans);
   letter-spacing: 0;
   margin-top: 8px;
 }
 .received-stamp {
   border: 3px double #b94430;
-  padding: 9px 15px;
+  padding: 8px 16px;
   color: #b94430;
   transform: rotate(-7deg);
   text-align: center;
@@ -1201,20 +1201,20 @@ body {
   min-height: 170px;
 }
 .handling-notes {
-  box-shadow: -4px 4px 0 -1px #dacfbf;
+  box-shadow: none;
 }
 .login-story {
   background: #bd422e;
   position: relative;
-  padding: 50px 12%;
+  padding: 52px 48px;
 }
 .login-envelope {
   width: 360px;
   height: 250px;
-  padding: 25px 35px;
+  padding: 24px 36px;
   position: relative;
   margin-bottom: 48px;
-  box-shadow: 0 18px 30px #6b211c40;
+  box-shadow: none;
   border: 1px solid #d9bd98;
   border-bottom: 0;
 }
@@ -1247,12 +1247,12 @@ body {
   place-content: center;
   transform: rotate(14deg);
   font:
-    9px Georgia,
+    11px Georgia,
     serif;
   color: #ad4c36;
 }
 .login-envelope i {
-  margin-top: 18px;
+  margin-top: 20px;
   font-size: 30px;
 }
 .login-form-wrap h1 {
@@ -1307,7 +1307,7 @@ body {
     font-size: 36px;
   }
   .envelope-trays {
-    margin-top: 30px;
+    margin-top: 32px;
   }
   .sorting-envelope {
     height: 200px;
@@ -1324,14 +1324,14 @@ body {
     height: 34px;
   }
   .correspondence-desk {
-    margin: 0 -2px;
+    margin: 0 -4px;
   }
   .desk-editorial,
   .letter-sorting {
-    padding: 22px 20px;
+    padding: 24px 20px;
   }
   .desk-edition {
-    font-size: 6px;
+    font-size: 11px;
   }
   .editorial-copy h2 {
     font-size: 31px;
@@ -1340,10 +1340,10 @@ body {
     display: block;
   }
   .editorial-copy .eyebrow {
-    font-size: 6px;
+    font-size: 11px;
   }
   .editorial-copy p {
-    font-size: 10px;
+    font-size: 11px;
   }
   .open-postmark {
     height: 112px;
@@ -1353,11 +1353,11 @@ body {
     font-size: 50px;
   }
   .open-postmark > span:first-child {
-    font-size: 5px;
+    font-size: 11px;
   }
   .envelope-trays {
     gap: 8px;
-    margin-bottom: 22px;
+    margin-bottom: 24px;
   }
   .sorting-envelope {
     height: 194px;
@@ -1365,16 +1365,16 @@ body {
   .envelope-letter {
     left: 3px;
     right: 3px;
-    padding: 13px 7px;
+    padding: 12px 8px;
   }
   .envelope-letter b {
     font-size: 16px;
   }
   .envelope-letter small {
-    font-size: 8px;
+    font-size: 11px;
   }
   .envelope-front {
-    padding: 24px 8px 10px;
+    padding: 24px 8px 12px;
     height: 100px;
   }
   .envelope-front strong {
@@ -1385,41 +1385,41 @@ body {
     font-size: 16px;
   }
   .envelope-index small {
-    font-size: 5px;
+    font-size: 11px;
   }
   .sorting-caption {
-    font-size: 8px;
+    font-size: 11px;
   }
   .triage-secondary {
     grid-template-columns: 1fr;
   }
   .mail-folders {
-    gap: 3px;
+    gap: 4px;
   }
   .mail-folders button {
-    padding: 10px 13px;
+    padding: 12px 12px;
     font-size: 11px;
   }
   .mail-tools {
     padding: 12px;
   }
   .mail-register .mail-row {
-    padding: 15px 12px;
+    padding: 16px 12px;
   }
   .mail-register .sender-seal {
     display: none;
   }
   .message-paper {
-    padding: 20px !important;
+    padding: 20px;
   }
   .letter-letterhead {
-    font-size: 6px;
+    font-size: 11px;
   }
   .letter-letterhead > span > small {
-    font-size: 9px;
+    font-size: 11px;
   }
   .received-stamp {
-    padding: 7px 10px;
+    padding: 8px 12px;
   }
   .message-paper .prose-message {
     font-size: 14px;

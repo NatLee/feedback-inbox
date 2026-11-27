@@ -22,7 +22,7 @@ export function Dashboard() {
         subtitle="CORRESPONDENCE / 收件、分流、留下處理進度"
         actions={
           <Link to="/inbox" className="btn btn-secondary">
-            打開收件匣 <ArrowRight size={15} />
+            打開收件匣 <ArrowRight size={16} />
           </Link>
         }
       />
@@ -57,7 +57,7 @@ export function Dashboard() {
               <>
                 <p>建立網站，取得表單收件網址，就能在這裡追蹤每一封來信。</p>
                 <Link to="/sites" className="btn btn-primary mt-4">
-                  新增網站 <ArrowRight size={15} />
+                  新增網站 <ArrowRight size={16} />
                 </Link>
               </>
             ) : (
@@ -80,7 +80,7 @@ export function Dashboard() {
                 <h3>最近來信</h3>
               </div>
               <Link to="/inbox" className="btn btn-ghost">
-                全部來信 <ArrowRight size={14} />
+                全部來信 <ArrowRight size={16} />
               </Link>
             </div>
             {data.recent.length ? (

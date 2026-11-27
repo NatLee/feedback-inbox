@@ -1,5 +1,9 @@
-import { Navigate, Route, Routes } from "react-router";
-import { Layout } from "./components/Layout";
+import { Connections } from "./access/Connections";
+import { Authorize } from "./access/Authorize";
+import { ContinueAuthorization } from "./access/ContinueAuthorization";
+import { safeAuthorizeNext } from "./access/navigation";
+import { Navigate, Route, Routes, useLocation } from "react-router";
+import { Layout, PageBody } from "./components/Layout";
 import { ErrorBanner, Loading } from "./components/ui";
 import { useApp } from "./context";
 import { Dashboard } from "./pages/Dashboard";
@@ -12,6 +16,7 @@ import { Sites } from "./pages/Sites";
 
 export function App() {
   const { auth, authError } = useApp();
+  const location=useLocation();
   if (!auth) {
     return (
       <div className="mx-auto max-w-md px-4 py-10">
@@ -21,9 +26,13 @@ export function App() {
   }
   // 還沒登入（或還沒有任何帳號）：只有登入頁
   if (!auth.user) return <Login setupRequired={auth.setup_required} />;
+  const next=safeAuthorizeNext(location.search);
+  if(next)return <ContinueAuthorization to={next}/>;
   return (
     <Routes>
+      <Route path="access/authorize" element={<Authorize/>}/>
       <Route element={<Layout />}>
+        <Route path="connections" element={<PageBody><Connections isAdmin={auth.user.role === "admin"}/></PageBody>}/>
         <Route index element={<Dashboard />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="inbox/:id" element={<FeedbackDetailPage />} />

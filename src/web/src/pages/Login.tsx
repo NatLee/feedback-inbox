@@ -1,3 +1,4 @@
+import { ProviderButtons } from "../access/ProviderButtons";
 import { LogIn, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { ErrorBanner, Spinner } from "../components/ui";
@@ -157,6 +158,7 @@ export function Login({ setupRequired }: { setupRequired: boolean }) {
               ? "這個帳號可以新增網站和其他成員。之後這個畫面就不會再出現。"
               : "沒有帳號或忘記密碼，請找管理員。"}
           </p>
+          {!setupRequired && <ProviderButtons/>}
         </form>
         <p className="login-footer">
           A LITTLE MORE PERSONAL. A LOT MORE ORGANIZED.

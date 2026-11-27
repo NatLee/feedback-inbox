@@ -38,7 +38,11 @@ Feedback Inbox 是這些表單的後端和收件匣。把表單的 `action` 指�
 
 ![步驟三：同一封來信已完成，團隊備註確實儲存](docs/images/workflow-03.png)
 
+[觀看實際選信、狀態與備註動態（WebM）](docs/images/feature-motion.webm)。選取定位線以 160 ms 回饋；閱讀、已儲存狀態與處理紀錄以 180 ms 銜接。系統啟用「減少動態」時立即呈現最後狀態。影片只記錄已登入的隔離 demo，不含登入畫面。
+
 重拍方式、資料還原與驗證範圍見 [操作驗證](docs/workflow-verification.md)；執行 [capture-workflow.py](docs/capture-workflow.py) 時，帳密由環境變數提供。
+
+新版來源樣式、桌面／手機檢查與錄影驗證見 [主題動態驗證](docs/themed-motion-verification.md)。
 
 ## 功能
 
@@ -93,13 +97,13 @@ cd feedback-inbox
 docker compose up -d --build
 ```
 
-打開 <http://localhost:8787>，第一次會請你建立管理員帳號。接著：
+打開 <http://127.0.0.1:8787>，第一次會請你建立管理員帳號。接著：
 
 1. 到「網站」新增一個網站，會拿到一個表單網址。
 2. 把它貼進表單的 `action`：
 
    ```html
-   <form action="http://localhost:8787/f/你的表單代碼" method="post">
+   <form action="http://127.0.0.1:8787/f/你的表單代碼" method="post">
      <input name="name" placeholder="姓名" required>
      <input name="email" type="email" placeholder="電子信箱" required>
      <textarea name="message" placeholder="想說的話" required></textarea>
@@ -175,14 +179,14 @@ docker compose --profile mail up -d
 
 ## 開發
 
-需要 Rust（stable）、Node 24、pnpm。
+需要 Rust（stable）、Node 24、pnpm。開發固定使用 `http://127.0.0.1:5173`；後端的 `ACCESS_PUBLIC_URL` 必須與前端相同。若另設 `FI_PUBLIC_URL`，也必須同 origin。
 
 ```bash
 # 後端：http://127.0.0.1:8787
-cd src/api && cargo run
+cd src/api && ACCESS_PUBLIC_URL=http://127.0.0.1:5173 cargo run
 
-# 前端：http://localhost:5173，/api 和 /f 會轉給後端
-cd src/web && pnpm install && pnpm dev
+# 前端：http://127.0.0.1:5173，/api 和 /f 會轉給後端
+cd src/web && pnpm install && pnpm dev --host 127.0.0.1 --port 5173 --strictPort
 ```
 
 ```bash
@@ -200,3 +204,7 @@ API 和 webhook 的格式在 [docs/api.md](docs/api.md)。
 ## 授權
 
 [MIT](LICENSE) © Nat Lee
+
+## 帳號綁定、OAuth、API 與 MCP
+
+原生「連線與存取」可綁定 GitHub／Google、建立與撤銷金鑰、管理應用授權及核對真正用量。`feedback:read` 可讀取既有站台權限內的來信、聯絡資料與內部備註。 設定與協定見 [存取指南](docs/access.md)，本機真實操作見 [錄影](docs/images/access-workflow.webm) 與 [稽核截圖](docs/images/access-03-usage.png)。

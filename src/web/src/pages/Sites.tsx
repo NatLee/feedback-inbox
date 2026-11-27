@@ -131,17 +131,17 @@ export function Sites() {
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                 <span className="inline-flex items-center gap-1">
-                  <Users className="size-3.5" />
+                  <Users className="size-4" />
                   {site.members.length === 0 ? "沒有負責人" : site.members.map((m) => m.display_name).join("、")}
                 </span>
                 {site.notify_email && (
                   <span className="inline-flex items-center gap-1">
-                    <Bell className="size-3.5" /> 通知信
+                    <Bell className="size-4" /> 通知信
                   </span>
                 )}
                 {site.has_webhook && (
                   <span className="inline-flex items-center gap-1">
-                    <Webhook className="size-3.5" /> Webhook
+                    <Webhook className="size-4" /> Webhook
                   </span>
                 )}
               </div>
