@@ -382,10 +382,16 @@ async fn real_official_sdk_discovers_calls_counts_and_rejects_revocation() {
 
 #[test]
 fn access_schema_is_the_frozen_snapshot() {
+    assert!(
+        include_str!("../migrations/0004_registration.sql").starts_with(include_str!(
+            "../../../crates/access-kit/migrations/0003_registration.sql"
+        ))
+    );
     assert_eq!(
         concat!(
             include_str!("../migrations/0002_access.sql"),
-            include_str!("../migrations/0003_access_client_registration.sql")
+            include_str!("../migrations/0003_access_client_registration.sql"),
+            include_str!("../../../crates/access-kit/migrations/0003_registration.sql")
         ),
         access_kit::SCHEMA_SQL
     );

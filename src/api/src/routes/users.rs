@@ -20,13 +20,14 @@ pub struct UserRow {
     email: String,
     role: String,
     disabled: bool,
+    account_status: String,
     created_at: String,
     /// 負責幾個網站
     site_count: i64,
 }
 
 const USER_SELECT: &str =
-    "SELECT u.id, u.username, u.display_name, u.email, u.role, u.disabled, u.created_at,
+    "SELECT u.id, u.username, u.display_name, u.email, u.role, u.disabled, u.account_status, u.created_at,
         (SELECT COUNT(*) FROM site_members m WHERE m.user_id = u.id) AS site_count
      FROM users u";
 
