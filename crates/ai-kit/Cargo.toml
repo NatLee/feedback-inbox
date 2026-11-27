@@ -1,0 +1,18 @@
+[package]
+name = "ai-kit"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Bounded structured-output transports for OpenAI, Anthropic and local Ollama"
+
+[dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+url = { version = "2", features = ["serde"] }
+jsonschema = { version = "0.63.2", default-features = false }
+
+[dev-dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }

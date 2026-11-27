@@ -17,3 +17,6 @@ data/
 .env
 .DS_Store
 desktop.ini
+
+# Reusable crate build output
+crates/*/target/
