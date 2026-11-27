@@ -50,6 +50,8 @@ export interface Site {
   /** 表單網址是 `/f/<key>` */
   key: string;
   allowed_origins: string[];
+  origin_mode: "legacy_public" | "exact";
+  embed_origins: string[];
   required_fields: Field[];
   redirect_url: string;
   /** 只有管理員拿得到；其他人是空字串 */
@@ -67,6 +69,8 @@ export interface SiteInput {
   name?: string;
   url?: string;
   allowed_origins?: string[];
+  origin_mode?: "exact";
+  embed_origins?: string[];
   required_fields?: Field[];
   redirect_url?: string;
   webhook_url?: string;

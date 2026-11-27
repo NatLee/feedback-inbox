@@ -15,6 +15,8 @@ export const site: Site = {
   name: "官方網站",
   url: "https://www.example.com",
   key: "abcd1234abcd1234",
+  origin_mode: "exact",
+  embed_origins: [],
   allowed_origins: ["https://www.example.com"],
   required_fields: ["name", "message"],
   redirect_url: "",

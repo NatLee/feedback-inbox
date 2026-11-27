@@ -162,7 +162,7 @@ pub fn random_hex(bytes: usize) -> String {
     buf.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn sha256_hex(text: &str) -> String {
+pub(crate) fn sha256_hex(text: &str) -> String {
     Sha256::digest(text.as_bytes())
         .iter()
         .map(|b| format!("{b:02x}"))

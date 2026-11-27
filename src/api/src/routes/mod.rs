@@ -2,6 +2,7 @@
 
 mod auth;
 mod feedback;
+mod forms;
 pub mod sites;
 mod stats;
 mod submit;
@@ -41,6 +42,14 @@ fn api_routes() -> Router<AppState> {
             get(sites::detail)
                 .patch(sites::update)
                 .delete(sites::remove),
+        )
+        .route("/sites/{id}/integrations", get(forms::integrations))
+        .route("/sites/{id}/form", get(forms::detail))
+        .route("/sites/{id}/form/draft", axum::routing::put(forms::draft))
+        .route("/sites/{id}/form/publish", post(forms::publish))
+        .route(
+            "/sites/{id}/form/versions/{version}/retire",
+            post(forms::retire),
         )
         .route("/sites/{id}/rotate-key", post(sites::rotate_key))
         .route("/sites/{id}/test", post(sites::test_notification))
@@ -83,15 +92,19 @@ pub fn router(state: AppState) -> Router {
                 .options(submit::preflight),
         )
         .route("/f/{key}/thanks", get(submit::thanks))
+        .route(
+            "/f/{key}/embed",
+            get(submit::form)
+                .post(submit::submit)
+                .options(submit::preflight),
+        )
+        .route("/f/{key}/embed/thanks", get(submit::thanks))
         .fallback_service(spa)
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_CONTENT_TYPE_OPTIONS,
             HeaderValue::from_static("nosniff"),
         ))
-        .layer(SetResponseHeaderLayer::if_not_present(
-            header::X_FRAME_OPTIONS,
-            HeaderValue::from_static("DENY"),
-        ))
+        .layer(middleware::from_fn(frame_guard))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::REFERRER_POLICY,
             HeaderValue::from_static("same-origin"),
@@ -115,4 +128,17 @@ async fn meta(State(state): State<AppState>) -> Json<Value> {
         "smtp_configured": state.mailer.is_some(),
         "public_url": state.config.public_url,
     }))
+}
+
+async fn frame_guard(
+    req: axum::extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    let mut response = next.run(req).await;
+    if response.extensions().get::<submit::Frameable>().is_none() {
+        response
+            .headers_mut()
+            .insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    }
+    response
 }

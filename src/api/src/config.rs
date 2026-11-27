@@ -119,20 +119,21 @@ fn truthy(v: &str) -> bool {
 
 /// `https://host:port/path` → `https://host:port`
 pub fn origin_of(url: &str) -> Option<String> {
-    let url = url.trim();
-    let (scheme, rest) = url.split_once("://")?;
-    if !matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https") {
+    let parsed = reqwest::Url::parse(url.trim()).ok()?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+    {
         return None;
     }
-    let host = rest
-        .split(['/', '?', '#'])
-        .next()
-        .filter(|h| !h.is_empty() && !h.contains(char::is_whitespace) && !h.contains('@'))?;
-    Some(format!(
-        "{}://{}",
-        scheme.to_ascii_lowercase(),
-        host.to_ascii_lowercase()
-    ))
+    let origin = parsed.origin().ascii_serialization();
+    if !origin
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b":/.-_[]".contains(&b))
+    {
+        return None;
+    }
+    Some(origin)
 }
 
 /// 讀環境變數；沒設定或只有空白都當成沒設定。
@@ -156,6 +157,16 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn origins_cannot_inject_csp_directives() {
+        assert_eq!(origin_of("https://example.com;script-src"), None);
+        assert_eq!(origin_of("https://example.com'"), None);
+        assert_eq!(
+            origin_of("https://example.com:443/path"),
+            Some("https://example.com".into())
+        );
+    }
 
     #[test]
     fn origin_drops_the_path() {

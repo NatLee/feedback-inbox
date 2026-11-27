@@ -8,6 +8,7 @@ pub mod config;
 pub mod db;
 pub mod demo;
 pub mod error;
+pub mod forms;
 pub mod intake;
 pub mod logging;
 pub mod notify;

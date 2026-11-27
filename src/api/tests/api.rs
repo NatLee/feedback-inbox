@@ -298,7 +298,12 @@ async fn api_writes_from_another_site_are_rejected_but_forms_are_not() {
     assert_eq!(status, StatusCode::OK);
 
     // 表單本來就是給別的網站送的
-    let site = t.site(&admin, json!({ "name": "官網" })).await;
+    let site = t
+        .site(
+            &admin,
+            json!({ "name": "官網", "allowed_origins": ["https://www.example.com"] }),
+        )
+        .await;
     let req = Request::builder()
         .method(Method::POST)
         .uri(format!("/f/{}", key(&site)))
@@ -309,7 +314,10 @@ async fn api_writes_from_another_site_are_rejected_but_forms_are_not() {
         .unwrap();
     let (status, headers, _) = t.send(req).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
+    assert_eq!(
+        headers[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+        "https://www.example.com"
+    );
 }
 
 #[tokio::test]
