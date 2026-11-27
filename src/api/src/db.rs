@@ -28,6 +28,9 @@ pub async fn connect(path: &Path) -> Result<SqlitePool> {
         .run(&pool)
         .await
         .context("資料庫 migration 失敗")?;
+    crate::forms::backfill(&pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("form backfill: {e:?}"))?;
     Ok(pool)
 }
 

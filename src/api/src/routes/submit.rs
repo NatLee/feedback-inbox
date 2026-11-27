@@ -1,10 +1,15 @@
-//! 收表單的公開網址：`/f/<key>`。不用登入，別的網站可以直接送過來。
-//!
-//! - `POST`：收 JSON 或一般的 HTML 表單。JSON 回 `{"ok": true}`；HTML 表單送完會轉去感謝頁。
-//! - `GET`：一張可以直接用的表單（不想自己刻表單時，把連結貼出去就好）。
-
-use std::net::SocketAddr;
-
+//! Public versioned intake. Browser origins, iframe framing and identity are separate controls.
+use crate::{
+    auth,
+    config::origin_of,
+    db,
+    error::{AppError, AppResult},
+    forms::{self, FormVersion, NormalizedAnswers},
+    intake::{truncate, HONEYPOT},
+    notify::{self, escape_html},
+    routes::sites::parse_list,
+    state::AppState,
+};
 use axum::{
     body::to_bytes,
     extract::{ConnectInfo, Path, Request, State},
@@ -12,106 +17,114 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde_json::{json, Value};
-
-use crate::{
-    auth,
-    config::origin_of,
-    db,
-    error::AppError,
-    intake::{field_label, truncate, Submission, FIELDS, HONEYPOT},
-    notify::{self, escape_html, Notice},
-    routes::sites::parse_list,
-    state::AppState,
-};
-
-/// 一次送出的內容上限。
-const MAX_BODY_BYTES: usize = 64 * 1024;
-
+use serde_json::{json, Map, Value};
+use std::net::SocketAddr;
+const MAX_BODY_BYTES: usize = 65_536;
 #[derive(sqlx::FromRow)]
 struct FormSite {
     id: i64,
     name: String,
     url: String,
     allowed_origins: String,
-    required_fields: String,
+    origin_mode: String,
+    embed_origins: String,
     redirect_url: String,
     active: bool,
 }
-
-async fn find_site(state: &AppState, key: &str) -> Result<Option<FormSite>, AppError> {
-    Ok(sqlx::query_as(
-        "SELECT id, name, url, allowed_origins, required_fields, redirect_url, active
-         FROM sites WHERE key = ?",
-    )
-    .bind(key)
-    .fetch_optional(&state.db)
-    .await?)
+async fn find_site(state: &AppState, key: &str) -> AppResult<Option<FormSite>> {
+    Ok(sqlx::query_as("SELECT id,name,url,allowed_origins,origin_mode,embed_origins,redirect_url,active FROM sites WHERE key=?").bind(key).fetch_optional(&state.db).await?)
 }
-
-/// 這個請求能不能送進這個網站，以及回應要帶的 CORS 標頭。
 struct Cors {
     allowed: bool,
     allow_origin: Option<HeaderValue>,
 }
-
 fn cors(state: &AppState, site: &FormSite, headers: &HeaderMap) -> Cors {
-    let origins = parse_list(&site.allowed_origins);
-    let raw = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok());
-    if origins.is_empty() {
+    if site.origin_mode == "legacy_public" {
         return Cors {
             allowed: true,
             allow_origin: Some(HeaderValue::from_static("*")),
         };
     }
-    let Some(raw) = raw else {
-        // 沒有 Origin 的不是瀏覽器的跨站請求（伺服器之間、命令列工具）
+    let Some(raw) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) else {
         return Cors {
             allowed: true,
             allow_origin: None,
         };
     };
-    let allowed = match origin_of(raw) {
-        // 內建的表單是從本站送出的
-        Some(origin) => origins.contains(&origin) || auth::same_origin(headers, &state.config),
-        None => false,
-    };
+    let allowed = origin_of(raw).is_some_and(|o| {
+        parse_list(&site.allowed_origins).contains(&o) || auth::same_origin(headers, &state.config)
+    });
     Cors {
         allowed,
         allow_origin: HeaderValue::from_str(raw).ok().filter(|_| allowed),
     }
 }
-
 fn with_cors(mut response: Response, cors: &Cors) -> Response {
-    let headers = response.headers_mut();
     if let Some(origin) = &cors.allow_origin {
-        headers.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin.clone());
+        response
+            .headers_mut()
+            .insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin.clone());
     }
-    headers.append(header::VARY, HeaderValue::from_static("Origin"));
+    response
+        .headers_mut()
+        .append(header::VARY, HeaderValue::from_static("Origin"));
     response
 }
-
-/// 訪客的 IP。前面有反向代理時（`FI_TRUST_PROXY`）看 `X-Forwarded-For` 的最後一個，
-/// 也就是代理自己加上去的那個；前面幾個是對方可以亂填的。
-fn client_ip(state: &AppState, req: &Request) -> String {
-    if state.config.trust_proxy {
-        let forwarded = req
-            .headers()
-            .get("x-forwarded-for")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.rsplit(',').next())
-            .map(str::trim)
-            .filter(|ip| !ip.is_empty());
-        if let Some(ip) = forwarded {
-            return truncate(ip, 60);
+/// Only this private response extension exempts an explicitly rendered public embed from DENY.
+#[derive(Clone)]
+pub(super) struct Frameable;
+fn page(title: &str, body: &str, embed: Option<&[String]>) -> Response {
+    let mut policy =
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"
+            .to_owned();
+    if let Some(origins) = embed {
+        policy.push_str("; frame-ancestors 'self'");
+        for origin in origins {
+            policy.push(' ');
+            policy.push_str(origin);
         }
     }
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|info| info.0.ip().to_string())
-        .unwrap_or_default()
+    let mut response = (
+        [
+            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        forms::render::document(title, body),
+    )
+        .into_response();
+    response.headers_mut().insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_str(&policy).expect("normalized origins"),
+    );
+    if embed.is_some() {
+        response.extensions_mut().insert(Frameable);
+    }
+    response
 }
-
+fn failure(
+    error: AppError,
+    json: bool,
+    embed: Option<&[String]>,
+    retry: Option<(&FormVersion, &str, &str, &Value)>,
+) -> Response {
+    let (status, message, code) = error.public_parts();
+    if json {
+        let mut value = json!({"error":message});
+        if let Some(code) = code {
+            value["code"] = json!(code);
+        }
+        (status, Json(value)).into_response()
+    } else {
+        let body = if let Some((version, action, id, values)) = retry {
+            forms::render::form(version, action, id, values, Some(&message))
+        } else {
+            format!("<h1>沒有送出去</h1><p class=\"error\">{}</p><p class=\"muted\">請重新開啟表單網址，或稍後再試。</p>",escape_html(&message))
+        };
+        let mut response = page("沒有送出去", &body, embed);
+        *response.status_mut() = status;
+        response
+    }
+}
 fn header_text(headers: &HeaderMap, name: header::HeaderName, max: usize) -> String {
     headers
         .get(name)
@@ -119,294 +132,454 @@ fn header_text(headers: &HeaderMap, name: header::HeaderName, max: usize) -> Str
         .map(|v| truncate(v.trim(), max))
         .unwrap_or_default()
 }
-
-/// 送的人要的是 JSON（用 fetch 送的），還是網頁（一般的 HTML 表單）。
-fn wants_json(headers: &HeaderMap, content_type: &str) -> bool {
-    content_type.starts_with("application/json")
-        || headers
-            .get(header::ACCEPT)
+fn client_ip(state: &AppState, req: &Request) -> String {
+    if state.config.trust_proxy {
+        if let Some(ip) = req
+            .headers()
+            .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
-            .is_some_and(|accept| accept.contains("application/json"))
+            .and_then(|v| v.rsplit(',').next())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            return truncate(ip, 60);
+        }
+    }
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|i| i.0.ip().to_string())
+        .unwrap_or_default()
 }
-
-fn failure(json: bool, status: StatusCode, message: &str) -> Response {
-    if json {
-        (status, Json(json!({ "error": message }))).into_response()
-    } else {
-        let body = format!(
-            "<h1>沒有送出去</h1><p>{}</p><p class=\"muted\">請回上一頁修改之後再送一次。</p>",
-            escape_html(message)
-        );
-        (status, page("沒有送出去", &body)).into_response()
+fn parse_form(body: &[u8]) -> AppResult<Value> {
+    let pairs: Vec<(String, String)> =
+        serde_urlencoded::from_bytes(body).map_err(|_| AppError::bad("表單內容讀不懂"))?;
+    let mut out = Map::new();
+    for (key, value) in pairs {
+        let key = key.trim_end_matches("[]").to_owned();
+        if let Some(previous) = out.remove(&key) {
+            let mut list = match previous {
+                Value::Array(a) => a,
+                v => vec![v],
+            };
+            list.push(json!(value));
+            out.insert(key, Value::Array(list));
+        } else {
+            out.insert(key, json!(value));
+        }
+    }
+    Ok(Value::Object(out))
+}
+fn canonical(value: &Value) -> Value {
+    match value {
+        Value::Object(m) => {
+            let sorted: std::collections::BTreeMap<_, _> =
+                m.iter().map(|(k, v)| (k, canonical(v))).collect();
+            serde_json::to_value(sorted).expect("JSON values")
+        }
+        Value::Array(a) => Value::Array(a.iter().map(canonical).collect()),
+        v => v.clone(),
     }
 }
-
+fn submission_key(input: &Value, headers: &HeaderMap) -> AppResult<Option<String>> {
+    let body = input.get("_submission_id").and_then(Value::as_str);
+    let header = headers.get("idempotency-key").and_then(|v| v.to_str().ok());
+    if body.is_some() && header.is_some() && body != header {
+        return Err(AppError::bad("送出識別碼不一致"));
+    }
+    let Some(key) = body.or(header) else {
+        return Ok(None);
+    };
+    if !(16..=80).contains(&key.len())
+        || !key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b))
+    {
+        return Err(AppError::bad("送出識別碼格式不符"));
+    }
+    Ok(Some(key.into()))
+}
+async fn receipt(state: &AppState, site_id: i64, key: Option<&str>, hash: &str) -> AppResult<bool> {
+    let Some(key) = key else { return Ok(false) };
+    let old:Option<String>=sqlx::query_scalar("SELECT request_hash FROM submission_receipts WHERE site_id=? AND submission_key=? AND expires_at>?").bind(site_id).bind(key).bind(chrono::Utc::now().timestamp()).fetch_optional(&state.db).await?;
+    match old {
+        Some(old) if old != hash => Err(AppError::conflict("相同送出識別碼不能用於不同內容")),
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
+}
 pub async fn submit(
     State(state): State<AppState>,
     Path(key): Path<String>,
     req: Request,
-) -> Result<Response, AppError> {
+) -> Response {
     let headers = req.headers().clone();
     let content_type = header_text(&headers, header::CONTENT_TYPE, 200).to_ascii_lowercase();
-    let json = wants_json(&headers, &content_type);
-
-    let Some(site) = find_site(&state, &key).await? else {
-        return Ok(failure(json, StatusCode::NOT_FOUND, "找不到這張表單"));
+    let wants_json = content_type.starts_with("application/json")
+        || headers
+            .get(header::ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|s| s.contains("application/json"));
+    let embed_mode = req.uri().path().ends_with("/embed");
+    let ip = client_ip(&state, &req);
+    let site = match find_site(&state, &key).await {
+        Ok(Some(s)) => s,
+        Ok(None) => {
+            return with_cors(
+                failure(
+                    AppError::not_found("找不到這張表單"),
+                    wants_json,
+                    None,
+                    None,
+                ),
+                &Cors {
+                    allowed: true,
+                    allow_origin: Some(HeaderValue::from_static("*")),
+                },
+            )
+        }
+        Err(e) => return failure(e, wants_json, None, None),
     };
     let cors = cors(&state, &site, &headers);
-    let fail = |status, message: &str| Ok(with_cors(failure(json, status, message), &cors));
+    let origins = parse_list(&site.embed_origins);
+    let embed = embed_mode.then_some(origins.as_slice());
+    let fail = |e| with_cors(failure(e, wants_json, embed, None), &cors);
     if !cors.allowed {
-        return fail(StatusCode::FORBIDDEN, "這張表單不接受從這個網站送出");
+        return fail(AppError::forbidden("這張表單不接受從這個網站送出"));
     }
     if !site.active {
-        return fail(StatusCode::FORBIDDEN, "這張表單已經關閉");
+        return fail(AppError::forbidden("這張表單已經關閉"));
     }
-    let ip = client_ip(&state, &req);
-    if !state.submissions.allow(&ip) {
-        return fail(StatusCode::TOO_MANY_REQUESTS, "送得太頻繁了，請稍後再試");
+    if embed_mode && origins.is_empty() {
+        return fail(AppError::forbidden("這張表單尚未開放嵌入"));
     }
-
-    let Ok(body) = to_bytes(req.into_body(), MAX_BODY_BYTES).await else {
-        return fail(StatusCode::PAYLOAD_TOO_LARGE, "內容太長了");
+    let body = match to_bytes(req.into_body(), MAX_BODY_BYTES).await {
+        Ok(b) => b,
+        Err(_) => return fail(AppError::coded(413, "body_too_large", "內容太長了")),
     };
-    let parsed = if content_type.starts_with("application/json") {
-        serde_json::from_slice::<Value>(&body)
-            .map_err(|_| "內容不是合法的 JSON".to_owned())
-            .and_then(|value| Submission::from_json(&value))
+    let input = if content_type.starts_with("application/json") {
+        serde_json::from_slice::<Value>(&body).map_err(|_| AppError::bad("內容不是合法的 JSON"))
     } else if content_type.starts_with("application/x-www-form-urlencoded") {
-        serde_urlencoded::from_bytes::<Vec<(String, String)>>(&body)
-            .map(Submission::from_form)
-            .map_err(|_| "表單的內容讀不懂".to_owned())
+        parse_form(&body)
     } else {
-        return fail(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        Err(AppError::coded(
+            415,
+            "unsupported_media_type",
             "只收 application/json 或 application/x-www-form-urlencoded",
-        );
+        ))
     };
-    let submission = match parsed {
-        Ok(submission) => submission,
-        Err(message) => return fail(StatusCode::BAD_REQUEST, &message),
+    let mut input = match input {
+        Ok(v) if v.is_object() => v,
+        Ok(_) => return fail(AppError::bad("內容要是 JSON 物件")),
+        Err(e) => return fail(e),
     };
-
-    // 機器人填了藏起來的欄位：照樣回成功，但不存
-    if !submission.honeypot {
-        if let Err(message) = submission.validate(&parse_list(&site.required_fields)) {
-            return fail(StatusCode::BAD_REQUEST, &message);
+    let submission_id = match submission_key(&input, &headers) {
+        Ok(id) => id,
+        Err(e) => return fail(e),
+    };
+    let hash = auth::sha256_hex(&canonical(&input).to_string());
+    let repeated = match receipt(&state, site.id, submission_id.as_deref(), &hash).await {
+        Ok(r) => r,
+        Err(e) => return fail(e),
+    };
+    if !repeated {
+        if !state.submissions.allow(&ip) {
+            return fail(AppError::TooManyRequests("送得太頻繁了，請稍後再試".into()));
         }
-        store(&state, &site, submission, &ip, &headers).await?;
+        let trap = input
+            .get(HONEYPOT)
+            .is_some_and(|v| !v.is_null() && v.as_str().is_none_or(|s| !s.trim().is_empty()));
+        if !trap {
+            let requested = match input.get("_form_version") {
+                None => None,
+                Some(v) => match v
+                    .as_i64()
+                    .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                {
+                    Some(n) if n > 0 => Some(n),
+                    _ => return fail(AppError::bad("表單版本格式不符")),
+                },
+            };
+            let version = match forms::load_version(&state.db, site.id, requested).await {
+                Ok(v) => v,
+                Err(e) => return fail(e),
+            };
+            let identity = match input.get("_identity_token") {
+                None => None,
+                Some(value) => {
+                    let Some(token) = value.as_str() else {
+                        return fail(AppError::bad("會員憑證格式不符"));
+                    };
+                    match forms::identity::verify_for_site(&state, site.id, token).await {
+                        Ok(identity) => Some(identity),
+                        Err(e) => return fail(e),
+                    }
+                }
+            };
+            if let Some(email) = identity
+                .as_ref()
+                .and_then(|identity| identity.email.as_ref())
+            {
+                let submitted = match crate::intake::Submission::from_json(&input) {
+                    Ok(value) => value,
+                    Err(e) => return fail(AppError::bad(e)),
+                };
+                if !submitted.email.is_empty() && !submitted.email.eq_ignore_ascii_case(email) {
+                    return fail(AppError::bad("Email 與已驗證會員身分不符"));
+                }
+                let object = input.as_object_mut().expect("object checked");
+                object.insert("email".into(), json!(email));
+                object.remove("mail");
+                object.remove("e-mail");
+            }
+            let test_token = match input.get("_test_token") {
+                None => None,
+                Some(value) => match value.as_str() {
+                    Some(value) => Some(value.to_owned()),
+                    None => return fail(AppError::bad("測試憑證格式不符")),
+                },
+            };
+            let answers =
+                match forms::validate_answers(&version.schema, &input, requested.is_none()) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        let action = format!("/f/{key}{}", if embed_mode { "/embed" } else { "" });
+                        let id = submission_id
+                            .clone()
+                            .unwrap_or_else(|| auth::random_hex(16));
+                        return with_cors(
+                            failure(e, wants_json, embed, Some((&version, &action, &id, &input))),
+                            &cors,
+                        );
+                    }
+                };
+            if let Err(e) = store(
+                &state,
+                &site,
+                &version,
+                answers,
+                &ip,
+                &headers,
+                submission_id.as_deref(),
+                &hash,
+                requested.is_none(),
+                identity.as_ref(),
+                test_token.as_deref(),
+            )
+            .await
+            {
+                return fail(e);
+            }
+        }
     }
-
-    let response = if json {
-        Json(json!({ "ok": true })).into_response()
+    let response = if wants_json {
+        Json(json!({"ok":true})).into_response()
     } else {
-        // 轉去哪裡只看網站的設定，不看表單送來的值（不然會變成任意轉址）
-        let to = if site.redirect_url.is_empty() {
+        let to = if embed_mode {
+            format!("/f/{key}/embed/thanks")
+        } else if site.redirect_url.is_empty() {
             format!("/f/{key}/thanks")
         } else {
             site.redirect_url.clone()
         };
         (StatusCode::SEE_OTHER, [(header::LOCATION, to)]).into_response()
     };
-    Ok(with_cors(response, &cors))
+    with_cors(response, &cors)
 }
-
+#[allow(clippy::too_many_arguments)]
 async fn store(
     state: &AppState,
     site: &FormSite,
-    submission: Submission,
+    version: &FormVersion,
+    answers: NormalizedAnswers,
     ip: &str,
     headers: &HeaderMap,
-) -> Result<(), AppError> {
+    submission_key: Option<&str>,
+    hash: &str,
+    legacy: bool,
+    identity: Option<&forms::identity::VerifiedIdentity>,
+    test_token: Option<&str>,
+) -> AppResult<()> {
+    let mut tx = state.db.begin_with("BEGIN IMMEDIATE").await?;
+    if let Some(key) = submission_key {
+        sqlx::query("DELETE FROM submission_receipts WHERE site_id=? AND submission_key=? AND expires_at<=?").bind(site.id).bind(key).bind(chrono::Utc::now().timestamp()).execute(&mut *tx).await?;
+        let old: Option<String> = sqlx::query_scalar(
+            "SELECT request_hash FROM submission_receipts WHERE site_id=? AND submission_key=?",
+        )
+        .bind(site.id)
+        .bind(key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        if let Some(old) = old {
+            if old != hash {
+                return Err(AppError::conflict("相同送出識別碼不能用於不同內容"));
+            }
+            return Ok(());
+        }
+    }
+    let (active, current): (bool, Option<i64>) =
+        sqlx::query_as("SELECT active,published_form_version_id FROM sites WHERE id=?")
+            .bind(site.id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if !active {
+        return Err(AppError::forbidden("這張表單已經關閉"));
+    }
+    if legacy && current != Some(version.id) {
+        return Err(AppError::conflict("表單已更新，請重新載入後送出"));
+    }
+    let valid:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM form_versions WHERE id=? AND site_id=? AND retired_at IS NULL)").bind(version.id).bind(site.id).fetch_one(&mut *tx).await?;
+    if !valid {
+        return Err(AppError::coded(
+            410,
+            "form_version_retired",
+            "這個表單版本已停用，請重新開啟表單網址",
+        ));
+    }
+    if let Some(identity) = identity {
+        forms::identity::consume(&mut tx, site.id, identity).await?;
+    }
+    if let Some(token) = test_token {
+        forms::identity::consume_verification(&mut tx, site.id, token).await?;
+    }
     let now = db::now();
-    let id = sqlx::query(
-        "INSERT INTO feedback (site_id, name, email, phone, company, message, extra,
-            ip, user_agent, page_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(site.id)
-    .bind(&submission.name)
-    .bind(&submission.email)
-    .bind(&submission.phone)
-    .bind(&submission.company)
-    .bind(&submission.message)
-    .bind(serde_json::to_string(&submission.extra)?)
-    .bind(ip)
-    .bind(header_text(headers, header::USER_AGENT, 300))
-    .bind(header_text(headers, header::REFERER, 500))
-    .bind(&now)
-    .bind(&now)
-    .execute(&state.db)
-    .await?
-    .last_insert_rowid();
-
-    let notice = Notice {
-        site_name: site.name.clone(),
-        feedback_id: id,
-        name: submission.name,
-        email: submission.email,
-        phone: submission.phone,
-        company: submission.company,
-        message: submission.message,
-        extra: submission.extra,
-        created_at: now,
-        link: state
-            .config
-            .public_url
-            .as_ref()
-            .map(|base| format!("{base}/inbox/{id}")),
-    };
-    // 通知在背景送，送表單的人不用等
-    tokio::spawn(notify::deliver(state.clone(), site.id, notice));
+    let s = answers.submission;
+    let id=sqlx::query("INSERT INTO feedback(site_id,name,email,phone,company,message,extra,ip,user_agent,page_url,created_at,updated_at,form_version_id,answers_json,submission_mode,identity_json,is_test) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+ .bind(site.id).bind(&s.name).bind(&s.email).bind(&s.phone).bind(&s.company).bind(&s.message).bind(serde_json::to_string(&s.extra)?).bind(ip).bind(header_text(headers,header::USER_AGENT,300)).bind(header_text(headers,header::REFERER,500)).bind(&now).bind(&now).bind(version.id).bind(answers.values.to_string()).bind(if legacy{"legacy_unversioned"}else{"versioned"}).bind(identity.map(serde_json::to_value).transpose()?.unwrap_or(json!({})).to_string()).bind(test_token.is_some()).execute(&mut *tx).await?.last_insert_rowid();
+    if let Some(key) = submission_key {
+        sqlx::query("INSERT INTO submission_receipts(site_id,submission_key,request_hash,feedback_id,expires_at) VALUES(?,?,?,?,?)").bind(site.id).bind(key).bind(hash).bind(id).bind(chrono::Utc::now().timestamp()+7*86400).execute(&mut *tx).await?;
+    }
+    if test_token.is_none() {
+        notify::enqueue(&mut tx, site.id, id).await?;
+        let settings = crate::ai::policy::load(&mut tx, site.id).await?;
+        if settings.enabled && settings.generate_on_receipt {
+            if let Some(actor) = settings.updated_by {
+                sqlx::query("SAVEPOINT ai_intake").execute(&mut *tx).await?;
+                if crate::ai::analysis::enqueue(&mut tx, state, id, actor)
+                    .await
+                    .is_err()
+                {
+                    sqlx::query("ROLLBACK TO ai_intake")
+                        .execute(&mut *tx)
+                        .await?;
+                    crate::workflow_audit::record(
+                        &mut tx,
+                        Some(site.id),
+                        Some(actor),
+                        "feedback",
+                        id,
+                        "automatic_analysis_skipped",
+                        json!({"reason":"configuration_or_input_unavailable"}),
+                    )
+                    .await?;
+                }
+                sqlx::query("RELEASE ai_intake").execute(&mut *tx).await?;
+            }
+        }
+    }
+    tx.commit().await?;
     Ok(())
 }
-
-/// CORS 的預檢：瀏覽器用 fetch 送 JSON 之前會先問。
 pub async fn preflight(
     State(state): State<AppState>,
     Path(key): Path<String>,
     headers: HeaderMap,
-) -> Result<Response, AppError> {
+) -> AppResult<Response> {
     let Some(site) = find_site(&state, &key).await? else {
-        return Ok(StatusCode::NOT_FOUND.into_response());
+        return Ok(with_cors(
+            StatusCode::NOT_FOUND.into_response(),
+            &Cors {
+                allowed: true,
+                allow_origin: Some(HeaderValue::from_static("*")),
+            },
+        ));
     };
     let cors = cors(&state, &site, &headers);
     if !cors.allowed {
         return Ok(with_cors(StatusCode::FORBIDDEN.into_response(), &cors));
     }
-    let response = (
-        StatusCode::NO_CONTENT,
-        [
-            (header::ACCESS_CONTROL_ALLOW_METHODS, "POST, OPTIONS"),
-            (header::ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Accept"),
-            (header::ACCESS_CONTROL_MAX_AGE, "86400"),
-        ],
-    )
-        .into_response();
-    Ok(with_cors(response, &cors))
+    Ok(with_cors(
+        (
+            StatusCode::NO_CONTENT,
+            [
+                (header::ACCESS_CONTROL_ALLOW_METHODS, "POST, OPTIONS"),
+                (
+                    header::ACCESS_CONTROL_ALLOW_HEADERS,
+                    "Content-Type, Accept, Idempotency-Key",
+                ),
+                (header::ACCESS_CONTROL_MAX_AGE, "600"),
+            ],
+        )
+            .into_response(),
+        &cors,
+    ))
 }
-
-const PAGE_STYLE: &str = "
-:root{color-scheme:light dark;--bg:#fafafa;--card:#fff;--line:#e4e4e7;--text:#18181b;--muted:#71717a;--brand:#0d9488;--brand-text:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#09090b;--card:#18181b;--line:#3f3f46;--text:#f4f4f5;--muted:#a1a1aa;--brand:#14b8a6;--brand-text:#042f2e}}
-*{box-sizing:border-box}
-body{margin:0;padding:32px 16px;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,'Segoe UI','Noto Sans TC','Microsoft JhengHei',sans-serif}
-main{max-width:520px;margin:0 auto;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:16px}
-h1{margin:0 0 4px;font-size:20px}
-p{margin:8px 0}
-.muted{color:var(--muted);font-size:13px}
-label{display:block;margin:16px 0 6px;font-size:13px;font-weight:600}
-label span{color:var(--brand)}
-input,textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:inherit;font:inherit}
-input:focus,textarea:focus{outline:2px solid var(--brand);outline-offset:1px}
-textarea{min-height:140px;resize:vertical}
-button,.button{display:inline-block;margin-top:20px;padding:10px 18px;border:0;border-radius:10px;background:var(--brand);color:var(--brand-text);font:inherit;font-weight:600;text-decoration:none;cursor:pointer}
-.trap{position:absolute;left:-9999px}
-";
-
-/// 內建頁面的外框。`body` 要是已經跳脫過的 HTML。
-fn page(title: &str, body: &str) -> Response {
-    let html = format!(
-        "<!doctype html><html lang=\"zh-Hant\"><head><meta charset=\"utf-8\">\
-         <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-         <meta name=\"robots\" content=\"noindex\"><title>{}</title><style>{PAGE_STYLE}</style></head>\
-         <body><main>{body}</main></body></html>",
-        escape_html(title)
-    );
-    (
-        [
-            (header::CONTENT_TYPE, "text/html; charset=utf-8"),
-            (
-                header::CONTENT_SECURITY_POLICY,
-                "default-src 'none'; style-src 'unsafe-inline'",
-            ),
-            (header::CACHE_CONTROL, "no-store"),
-        ],
-        html,
-    )
-        .into_response()
-}
-
-fn not_found_page() -> Response {
-    let mut response = page(
-        "找不到這張表單",
-        "<h1>找不到這張表單</h1><p class=\"muted\">網址可能打錯了，或是這張表單已經換了新的網址。</p>",
-    );
-    *response.status_mut() = StatusCode::NOT_FOUND;
-    response
-}
-
-/// 內建的表單。
 pub async fn form(
     State(state): State<AppState>,
     Path(key): Path<String>,
-) -> Result<Response, AppError> {
+    req: Request,
+) -> AppResult<Response> {
+    let embed_mode = req.uri().path().ends_with("/embed");
     let Some(site) = find_site(&state, &key).await? else {
-        return Ok(not_found_page());
+        return Ok(failure(
+            AppError::not_found("找不到這張表單"),
+            false,
+            None,
+            None,
+        ));
     };
-    let name = escape_html(&site.name);
-    if !site.active {
-        let body =
-            format!("<h1>{name}</h1><p class=\"muted\">這張表單已經關閉，不再收新的訊息。</p>");
-        return Ok(page(&site.name, &body));
-    }
-    let required = parse_list(&site.required_fields);
-    let mut fields = String::new();
-    for field in FIELDS {
-        let must = required.iter().any(|r| r == field);
-        let attrs = format!(
-            "id=\"{field}\" name=\"{field}\"{}",
-            if must { " required" } else { "" }
-        );
-        let control = match field {
-            "message" => format!("<textarea {attrs} maxlength=\"10000\"></textarea>"),
-            "email" => {
-                format!("<input {attrs} type=\"email\" maxlength=\"254\" autocomplete=\"email\">")
-            }
-            "phone" => {
-                format!("<input {attrs} type=\"tel\" maxlength=\"50\" autocomplete=\"tel\">")
-            }
-            "name" => {
-                format!("<input {attrs} type=\"text\" maxlength=\"100\" autocomplete=\"name\">")
-            }
-            _ => format!(
-                "<input {attrs} type=\"text\" maxlength=\"200\" autocomplete=\"organization\">"
-            ),
-        };
-        fields.push_str(&format!(
-            "<label for=\"{field}\">{}{}</label>{control}",
-            field_label(field),
-            if must { " <span>*</span>" } else { "" }
+    let origins = parse_list(&site.embed_origins);
+    if embed_mode && origins.is_empty() {
+        return Ok(failure(
+            AppError::forbidden("這張表單尚未開放嵌入"),
+            false,
+            None,
+            None,
         ));
     }
-    let body = format!(
-        "<h1>{name}</h1><p class=\"muted\">留下訊息，我們會盡快回覆。</p>\
-         <form method=\"post\" action=\"/f/{key}\">{fields}\
-         <div class=\"trap\" aria-hidden=\"true\"><label for=\"{HONEYPOT}\">這一格請留白</label>\
-         <input id=\"{HONEYPOT}\" name=\"{HONEYPOT}\" type=\"text\" tabindex=\"-1\" autocomplete=\"off\"></div>\
-         <button type=\"submit\">送出</button></form>",
-        key = escape_html(&key),
-    );
-    Ok(page(&site.name, &body))
+    let embed = embed_mode.then_some(origins.as_slice());
+    if !site.active {
+        return Ok(page(
+            &site.name,
+            "<h1>這張表單已經關閉</h1><p>不再收新的訊息。</p>",
+            embed,
+        ));
+    }
+    let version = forms::load_version(&state.db, site.id, None).await?;
+    let action = format!("/f/{key}{}", if embed_mode { "/embed" } else { "" });
+    Ok(page(
+        &site.name,
+        &forms::render::form(&version, &action, &auth::random_hex(16), &Value::Null, None),
+        embed,
+    ))
 }
-
-/// HTML 表單送出之後的感謝頁（網站沒有設定自己的轉址時用）。
 pub async fn thanks(
     State(state): State<AppState>,
     Path(key): Path<String>,
-) -> Result<Response, AppError> {
+    req: Request,
+) -> AppResult<Response> {
     let Some(site) = find_site(&state, &key).await? else {
-        return Ok(not_found_page());
+        return Ok(failure(
+            AppError::not_found("找不到這張表單"),
+            false,
+            None,
+            None,
+        ));
     };
+    let version = forms::load_version(&state.db, site.id, None).await?;
+    let origins = parse_list(&site.embed_origins);
+    let embed = req
+        .uri()
+        .path()
+        .ends_with("/embed/thanks")
+        .then_some(origins.as_slice());
     let back = if site.url.is_empty() {
         String::new()
     } else {
         format!(
-            "<a class=\"button\" href=\"{}\">回到 {}</a>",
+            "<a class=\"button\" href=\"{}\" target=\"_blank\" rel=\"noopener\">回到 {}</a>",
             escape_html(&site.url),
             escape_html(&site.name)
         )
     };
-    let body =
-        format!("<h1>已經收到你的訊息</h1><p class=\"muted\">謝謝，我們會盡快回覆。</p>{back}");
-    Ok(page("已經收到你的訊息", &body))
+    Ok(page("已經收到你的訊息",&format!("<span class=\"stamp\">RECEIVED / 收件回執</span><h1>已經收到你的訊息</h1><p>{}</p>{back}",escape_html(&version.schema.success_message)),embed))
 }

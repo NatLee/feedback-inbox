@@ -346,7 +346,7 @@ pub async fn targets(state: &AppState, site_id: i64) -> Result<Targets> {
     let emails = if notify_email {
         sqlx::query_scalar(
             "SELECT u.email FROM site_members m JOIN users u ON u.id = m.user_id
-             WHERE m.site_id = ? AND u.disabled = 0 AND u.email != '' ORDER BY u.id",
+             WHERE m.site_id = ? AND u.disabled = 0 AND u.account_status = 'active' AND u.email != '' ORDER BY u.id",
         )
         .bind(site_id)
         .fetch_all(&state.db)
@@ -400,39 +400,170 @@ pub async fn send(state: &AppState, targets: &Targets, notice: &Notice) -> Vec<O
     outcomes
 }
 
-/// 新訊息進來之後在背景執行：送通知，並把結果記下來。
-pub async fn deliver(state: AppState, site_id: i64, notice: Notice) {
-    let targets = match targets(&state, site_id).await {
-        Ok(targets) => targets,
-        Err(err) => {
-            tracing::error!("讀不到網站 {site_id} 的通知設定：{err:#}");
-            return;
+/// Snapshot one durable task per destination inside the intake transaction.
+pub async fn enqueue(
+    tx: &mut sqlx::SqliteConnection,
+    site: i64,
+    feedback: i64,
+) -> crate::error::AppResult<()> {
+    let (email, webhook): (bool, String) =
+        sqlx::query_as("SELECT notify_email,webhook_url FROM sites WHERE id=?")
+            .bind(site)
+            .fetch_one(&mut *tx)
+            .await?;
+    if email {
+        let targets:Vec<String>=sqlx::query_scalar("SELECT u.email FROM users u JOIN site_members m ON m.user_id=u.id WHERE m.site_id=? AND u.disabled=0 AND u.account_status='active' AND u.email!=''").bind(site).fetch_all(&mut *tx).await?;
+        for target in targets {
+            let hash = crate::auth::sha256_hex(&target);
+            crate::jobs::enqueue(
+                tx,
+                site,
+                "notify_email",
+                json!({"feedback_id":feedback,"target":target}),
+                &format!("notice:{feedback}:email:{hash}"),
+            )
+            .await?;
+        }
+    }
+    if !webhook.is_empty() {
+        let hash = crate::auth::sha256_hex(&webhook);
+        crate::jobs::enqueue(
+            tx,
+            site,
+            "notify_webhook",
+            json!({"feedback_id":feedback,"target_hash":hash}),
+            &format!("notice:{feedback}:webhook:{hash}"),
+        )
+        .await?;
+    }
+    Ok(())
+}
+#[derive(sqlx::FromRow)]
+struct NoticeRow {
+    id: i64,
+    site_id: i64,
+    site_name: String,
+    name: String,
+    email: String,
+    phone: String,
+    company: String,
+    message: String,
+    extra: String,
+    created_at: String,
+}
+pub async fn execute(state: &AppState, claim: &crate::jobs::Claim) -> crate::error::AppResult<()> {
+    use crate::error::AppError;
+    let payload: Value = serde_json::from_str(&claim.payload_json)?;
+    let id = payload["feedback_id"]
+        .as_i64()
+        .ok_or_else(|| AppError::bad("通知工作格式不符"))?;
+    let mut tx = state.db.begin_with("BEGIN IMMEDIATE").await?;
+    crate::jobs::current(&mut tx, claim).await?;
+    let row:Option<NoticeRow>=sqlx::query_as("SELECT f.id,f.site_id,s.name site_name,f.name,f.email,f.phone,f.company,f.message,f.extra,f.created_at FROM feedback f JOIN sites s ON s.id=f.site_id WHERE f.id=? AND f.site_id=? AND f.is_test=0 AND s.active=1").bind(id).bind(claim.site_id).fetch_optional(&mut *tx).await?;
+    let row = row.ok_or_else(|| AppError::conflict("訊息或網站已停用"))?;
+    let notice = Notice {
+        site_name: row.site_name,
+        feedback_id: row.id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        company: row.company,
+        message: row.message,
+        extra: serde_json::from_str(&row.extra)?,
+        created_at: row.created_at,
+        link: state
+            .config
+            .public_url
+            .as_ref()
+            .map(|base| format!("{base}/inbox/{id}")),
+    };
+    let (channel, target) = if claim.kind == "notify_email" {
+        let target = payload["target"]
+            .as_str()
+            .ok_or_else(|| AppError::bad("通知收件者格式不符"))?
+            .to_owned();
+        let allowed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM sites s JOIN site_members m ON m.site_id=s.id JOIN users u ON u.id=m.user_id WHERE s.id=? AND s.notify_email=1 AND u.disabled=0 AND u.account_status='active' AND u.email=?)").bind(row.site_id).bind(&target).fetch_one(&mut *tx).await?;
+        if !allowed {
+            return Err(AppError::conflict("通知收件者已變更"));
+        }
+        ("email", target)
+    } else {
+        let target: String = sqlx::query_scalar("SELECT webhook_url FROM sites WHERE id=?")
+            .bind(row.site_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if payload["target_hash"] != crate::auth::sha256_hex(&target) {
+            return Err(AppError::conflict("通知網址已變更"));
+        }
+        ("webhook", target)
+    };
+    tx.commit().await?;
+    let (ok, detail) = if channel == "email" {
+        match &state.mailer {
+            Some(m) => match bounded(m.send(&target, &notice)).await {
+                Ok(()) => (true, String::new()),
+                Err(_) => (false, "SMTP 結果不明；不會自動重寄".to_owned()),
+            },
+            None => (false, "尚未設定 SMTP".to_owned()),
+        }
+    } else {
+        match bounded(send_webhook(&state.http, &target, &notice)).await {
+            Ok(()) => (true, String::new()),
+            Err(e) => (false, format!("{e:#}")),
         }
     };
-    for outcome in send(&state, &targets, &notice).await {
-        if !outcome.ok {
-            tracing::warn!(
-                "訊息 {} 的通知沒送出去（{} → {}）：{}",
-                notice.feedback_id,
-                outcome.channel,
-                outcome.target,
-                outcome.detail
+    let mut tx = state.db.begin_with("BEGIN IMMEDIATE").await?;
+    crate::jobs::current(&mut tx, claim).await?;
+    sqlx::query("INSERT INTO deliveries(feedback_id,channel,target,ok,detail,created_at) VALUES(?,?,?,?,?,?)").bind(id).bind(channel).bind(if channel=="webhook"{mask_url(&target)}else{target}).bind(ok).bind(detail).bind(db::now()).execute(&mut *tx).await?;
+    sqlx::query("UPDATE workflow_jobs SET state=?,error_code=?,token=NULL,lease_until=NULL WHERE id=? AND token=?").bind(if ok{"succeeded"}else if channel=="email"&&state.mailer.is_some(){"delivery_unknown"}else{"failed"}).bind((!ok).then_some("notification_failed")).bind(claim.id).bind(&claim.token).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub enum ReplyOutcome {
+    Accepted,
+    RejectedTransient,
+    RejectedPermanent,
+    Unknown,
+    Invalid,
+}
+impl Mailer {
+    /// Only a definitive negative SMTP reply is retryable. Any I/O/TLS/timeout ambiguity is quarantined.
+    pub async fn send_reply(&self, reply: &crate::ai::replies::Outbound) -> ReplyOutcome {
+        let Ok(to) = reply.recipient.parse::<Mailbox>() else {
+            return ReplyOutcome::Invalid;
+        };
+        let message = Message::builder()
+            .from(self.from.clone())
+            .to(to)
+            .subject(&reply.subject)
+            .message_id(Some(reply.message_id.clone()))
+            .raw_header(lettre::message::header::HeaderValue::new(
+                lettre::message::header::HeaderName::new_from_ascii_str("Auto-Submitted"),
+                "auto-replied".into(),
+            ))
+            .multipart(
+                MultiPart::alternative()
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(ContentType::TEXT_PLAIN)
+                            .body(reply.body.clone()),
+                    )
+                    .singlepart(SinglePart::builder().header(ContentType::TEXT_HTML).body(
+                        format!(
+                            "<div style=\"white-space:pre-wrap\">{}</div>",
+                            escape_html(&reply.body)
+                        ),
+                    )),
             );
-        }
-        let saved = sqlx::query(
-            "INSERT INTO deliveries (feedback_id, channel, target, ok, detail, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(notice.feedback_id)
-        .bind(outcome.channel)
-        .bind(&outcome.target)
-        .bind(outcome.ok)
-        .bind(truncate(&outcome.detail, 500))
-        .bind(db::now())
-        .execute(&state.db)
-        .await;
-        if let Err(err) = saved {
-            tracing::error!("通知結果寫不進資料庫：{err:#}");
+        let Ok(message) = message else {
+            return ReplyOutcome::Invalid;
+        };
+        match tokio::time::timeout(DEADLINE, self.transport.send(message)).await {
+            Ok(Ok(_)) => ReplyOutcome::Accepted,
+            Ok(Err(e)) if e.is_permanent() => ReplyOutcome::RejectedPermanent,
+            Ok(Err(e)) if e.is_transient() => ReplyOutcome::RejectedTransient,
+            _ => ReplyOutcome::Unknown,
         }
     }
 }

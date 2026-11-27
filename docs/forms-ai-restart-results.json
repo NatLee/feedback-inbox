@@ -1,0 +1,11 @@
+{
+  "analysis_job_id": 8,
+  "outbound_id": 3,
+  "reply_job_id": 9,
+  "feedback_id": 4,
+  "analysis_attempts": 2,
+  "reply_attempts": 1,
+  "mail_count_before": 5,
+  "mail_count_after": 5,
+  "scenario": "Persisted fixture crash states, real API process stop/start"
+}

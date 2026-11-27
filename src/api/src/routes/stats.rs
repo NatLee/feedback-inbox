@@ -30,6 +30,7 @@ pub async fn overview(
     let tz_offset = i64::from(params.tz_offset.unwrap_or(0).clamp(-14 * 60, 14 * 60));
 
     let mut qb = QueryBuilder::new("SELECT f.status, COUNT(*) FROM feedback f WHERE 1 = 1");
+    qb.push(" AND f.is_test=0");
     push_visible(&mut qb, &user);
     qb.push(" GROUP BY f.status");
     let counts: HashMap<String, i64> = qb
@@ -55,6 +56,7 @@ pub async fn overview(
         let mut qb = QueryBuilder::new(
             "SELECT COUNT(*) FROM feedback f WHERE f.status IN ('new', 'in_progress')",
         );
+        qb.push(" AND f.is_test=0");
         push_visible(&mut qb, &user);
         feedback::push_age(&mut qb, age, now)?;
         let count: i64 = qb.build_query_scalar().fetch_one(&state.db).await?;
@@ -67,6 +69,7 @@ pub async fn overview(
     qb.push_bind(format!("{tz_offset:+} minutes"))
         .push(")) AS day, COUNT(*) FROM feedback f WHERE f.status != 'spam' AND f.created_at >= ")
         .push_bind(db::format_time(since));
+    qb.push(" AND f.is_test=0");
     push_visible(&mut qb, &user);
     qb.push(" GROUP BY day");
     let per_day: HashMap<String, i64> = qb
@@ -94,10 +97,10 @@ pub async fn overview(
 
     let mut qb = QueryBuilder::new(
         "SELECT s.id, s.name, s.active,
-            (SELECT COUNT(*) FROM feedback f WHERE f.site_id = s.id AND f.status != 'spam'),
+            (SELECT COUNT(*) FROM feedback f WHERE f.is_test=0 AND f.site_id = s.id AND f.status != 'spam'),
             (SELECT COUNT(*) FROM feedback f
-              WHERE f.site_id = s.id AND f.status IN ('new', 'in_progress')),
-            (SELECT MAX(f.created_at) FROM feedback f WHERE f.site_id = s.id AND f.status != 'spam')
+              WHERE f.is_test=0 AND f.site_id = s.id AND f.status IN ('new', 'in_progress')),
+            (SELECT MAX(f.created_at) FROM feedback f WHERE f.is_test=0 AND f.site_id = s.id AND f.status != 'spam')
          FROM sites s WHERE 1 = 1",
     );
     if !user.is_admin() {

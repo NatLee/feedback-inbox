@@ -32,6 +32,7 @@ impl Fixture {
             trust_proxy: false,
             rate_limit: 0,
             smtp: None,
+            workflow: Default::default(),
         };
         let state = build_state(config).await.unwrap();
         let admin = auth::create_user(

@@ -1,3 +1,4 @@
+import {ReviewQueue} from "./ai/ReviewQueue";
 import { Register } from "./pages/Register";
 import { Connections } from "./access/Connections";
 import { Authorize } from "./access/Authorize";
@@ -49,6 +50,7 @@ export function App() {
       <Route element={<Layout />}>
         <Route path="connections" element={<PageBody><Connections isAdmin={auth.user.role === "admin"}/></PageBody>}/>
         <Route index element={<Dashboard />} />
+        <Route path="review" element={<ReviewQueue />} />
         <Route path="inbox" element={<InboxPage />} />
         <Route path="inbox/:id" element={<FeedbackDetailPage />} />
         <Route path="sites" element={<Sites />} />

@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="800" viewBox="0 0 1440 800" role="img" aria-labelledby="title desc">
+  <title id="title">Feedback Inbox：從公開表單，到核對過的回信</title>
+  <desc id="desc">可編輯的功能流程插畫。三張信紙依序呈現可自訂欄位與嵌入的表單、帶原文證據的 AI 建議與人工核對、客戶回信。下方說明自動寄送只用核准固定範本，另需已驗證信箱、回覆意願、唯一規則與配額。這不是產品截圖或寄送紀錄。</desc>
+  <defs>
+    <pattern id="paper-lines" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#e8dfd3" stroke-width=".6"/></pattern>
+    <pattern id="airmail" width="28" height="10" patternUnits="userSpaceOnUse" patternTransform="skewX(-35)"><rect width="14" height="10" fill="#b8422b"/><rect x="14" width="14" height="10" fill="#fffdf8"/></pattern>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1L6 4 1 7" fill="none" stroke="#b8422b" stroke-width="1.4"/></marker>
+    <style>
+      text{font-family:'Noto Sans TC','PingFang TC','Microsoft JhengHei',sans-serif;fill:#342a23}
+      .muted{fill:#827163}.accent{fill:#b8422b}.micro{font-size:11px;letter-spacing:2px}.small{font-size:15px}.body{font-size:18px}.label{font-size:19px;font-weight:650}.serif{font-family:Georgia,'Noto Serif TC','Songti TC',serif}.rule{stroke:#d9ccbb;fill:none}.paper{fill:#fffdf8;stroke:#d7c9b6;stroke-width:1.4}.field{fill:#f8f3ea;stroke:#ded2c2}
+    </style>
+  </defs>
+  <rect width="1440" height="800" fill="#f3ede1"/>
+  <rect x="890" width="550" height="800" fill="url(#paper-lines)" opacity=".55"/>
+  <path d="M52 56H1388" class="rule"/>
+  <circle cx="59" cy="36" r="3" fill="#b8422b"/>
+  <text x="73" y="40" class="micro muted">FEEDBACK INBOX / CORRESPONDENCE DESK</text>
+  <text x="1388" y="40" text-anchor="end" class="micro muted">FORMS · EVIDENCE · REPLIES</text>
+  <text x="63" y="126" font-size="43" font-weight="650">從一張表單，到一封核對過的回信。</text>
+  <text x="65" y="167" class="body muted">讓來信有完整欄位，讓建議有原文依據，讓每次寄送有明確的決定。</text>
+  <text x="1380" y="151" text-anchor="end" class="serif accent" font-size="56" font-weight="700">POST ROOM.</text>
+
+  <!-- 01: editable form illustration -->
+  <g transform="translate(72 224) rotate(-2 179 206)">
+    <rect x="8" y="10" width="354" height="410" fill="#e3d8c7" opacity=".65"/>
+    <rect width="354" height="410" rx="3" class="paper"/>
+    <rect width="354" height="8" fill="url(#airmail)"/>
+    <text x="25" y="44" class="micro accent">01 / PUBLISH</text>
+    <text x="25" y="80" class="label">一個連結，開始收件</text>
+    <text x="25" y="109" class="small muted">現成表單 · 自訂欄位 · 網站嵌入</text>
+    <path d="M25 127H329" class="rule"/>
+    <text x="25" y="155" class="small">Email</text>
+    <rect x="25" y="166" width="304" height="35" rx="2" class="field"/>
+    <text x="37" y="189" class="small muted">visitor@example.test</text>
+    <text x="25" y="225" class="small">會員編號</text>
+    <text x="186" y="225" class="small">詢問類型</text>
+    <rect x="25" y="237" width="144" height="35" rx="2" class="field"/>
+    <rect x="185" y="237" width="144" height="35" rx="2" class="field"/>
+    <text x="37" y="260" class="small muted">自訂欄位</text>
+    <text x="197" y="260" class="small muted">一般詢問</text>
+    <path d="m309 251 5 5 5-5" stroke="#827163" fill="none"/>
+    <rect x="25" y="292" width="14" height="14" rx="2" fill="#b8422b"/>
+    <path d="m28 299 3 3 5-7" stroke="#fffdf8" fill="none" stroke-width="1.4"/>
+    <text x="49" y="305" class="small">希望收到回覆</text>
+    <rect x="25" y="337" width="124" height="42" rx="3" fill="#b8422b"/>
+    <text x="87" y="364" text-anchor="middle" font-size="16" fill="#fffdf8" style="fill:#fffdf8">分享／嵌入</text>
+    <text x="329" y="364" text-anchor="end" class="micro muted">FORM v3</text>
+  </g>
+  <path d="M443 423H491" stroke="#b8422b" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- 02: evidence and immutable human decision -->
+  <g transform="translate(510 210)">
+    <rect x="8" y="10" width="382" height="444" fill="#e3d8c7" opacity=".65"/>
+    <rect width="382" height="444" rx="3" class="paper"/>
+    <text x="25" y="40" class="micro accent">02 / REVIEW</text>
+    <text x="25" y="78" class="label">先看證據，再採用建議</text>
+    <text x="25" y="108" class="small muted">AI 摘要與分類 · 來源引文 · 回覆草稿</text>
+    <path d="M25 127H357" class="rule"/>
+    <text x="25" y="157" class="small muted">原文證據（已遮蔽聯絡資訊）</text>
+    <path d="M25 175V233" stroke="#b8422b" stroke-width="2"/>
+    <text x="39" y="195" class="small">「想了解服務時間，</text>
+    <text x="39" y="224" class="small">  請回覆 [EMAIL]，謝謝。」</text>
+    <rect x="25" y="256" width="332" height="110" rx="2" class="field"/>
+    <text x="41" y="283" class="micro muted">EXACT REPLY / VERSION 02</text>
+    <text x="41" y="312" class="small">收件者、主旨與完整內容</text>
+    <text x="41" y="340" class="small muted">儲存版本後，再由人核准寄出</text>
+    <g transform="translate(241 377) rotate(-7)">
+      <rect width="116" height="43" fill="none" stroke="#b8422b" stroke-width="1.5"/>
+      <text x="58" y="27" text-anchor="middle" class="accent" font-size="17" font-weight="650">人工核對</text>
+    </g>
+    <text x="25" y="409" class="micro muted">EVIDENCE → DECISION</text>
+  </g>
+  <path d="M906 423H949" stroke="#b8422b" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- 03: reviewed correspondence, separate from internal notes -->
+  <g transform="translate(968 242) rotate(2 170 191)">
+    <rect x="7" y="10" width="330" height="382" fill="#e3d8c7" opacity=".65"/>
+    <rect width="330" height="382" rx="3" class="paper"/>
+    <text x="25" y="40" class="micro accent">03 / REPLY</text>
+    <text x="25" y="77" class="label">把回覆，交到來信者手上</text>
+    <text x="25" y="107" class="small muted">客戶回信與團隊備註分開</text>
+    <path d="M25 126H305" class="rule"/>
+    <g transform="translate(32 154)">
+      <rect width="266" height="139" rx="3" fill="#f4e9d9" stroke="#c9b69d" stroke-width="1.5"/>
+      <path d="m1 1 132 87L265 1M1 138l93-77M265 138l-93-77" fill="none" stroke="#c9b69d" stroke-width="1.5"/>
+      <circle cx="133" cy="87" r="25" fill="#b8422b"/>
+      <path d="m122 87 8 8 16-18" fill="none" stroke="#fffdf8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <text x="25" y="328" class="small">人工核准寄送</text>
+    <text x="25" y="355" class="small muted">或符合規則的核准固定範本</text>
+  </g>
+
+  <path d="M64 695H1376" class="rule"/>
+  <rect x="64" y="719" width="213" height="32" rx="2" fill="#b8422b"/>
+  <text x="170" y="741" text-anchor="middle" font-size="15" style="fill:#fffdf8">自動寄送，只用核准範本</text>
+  <text x="302" y="741" class="small muted">已驗證 Email ＋ 明確回覆意願 ＋ 唯一規則 ＋ 寄送配額</text>
+  <text x="1376" y="778" text-anchor="end" class="micro muted">EDITABLE WORKFLOW ILLUSTRATION · NOT A DELIVERY RECORD</text>
+</svg>

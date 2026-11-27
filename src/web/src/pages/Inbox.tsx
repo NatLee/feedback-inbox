@@ -83,6 +83,10 @@ export function InboxPage() {
   }, [q]);
 
   const filter: FeedbackFilter = {
+    test_only:params.get("test_only")==="true"?true:undefined,
+    category:params.get("category")||undefined,
+    urgency:params.get("urgency")||undefined,
+    review_only:params.get("review_only")==="true"?true:undefined,
     age,
     sort: sort === "newest" ? undefined : sort,
     site_id: siteId,
@@ -110,7 +114,7 @@ export function InboxPage() {
   const allSelected =
     items.length > 0 && items.every((i) => selected.has(i.id));
   const filtered = Boolean(
-    status || siteId || filter.q || from || to || age || sort !== "newest",
+    status || siteId || filter.q || from || to || age || sort !== "newest" || filter.test_only || filter.category || filter.urgency || filter.review_only,
   );
 
   const toggle = (id: number) =>
@@ -241,6 +245,10 @@ export function InboxPage() {
           <option value="newest">最新來信優先</option>
           <option value="oldest">最舊來信優先</option>
         </select>
+        <select className="input w-auto" aria-label="來信來源" value={filter.test_only?'test':'normal'} onChange={e=>set({test_only:e.target.value==='test'?'true':undefined})}><option value="normal">正式來信</option><option value="test">安裝測試來信</option></select>
+        <select className="input w-auto" aria-label="優先程度篩選" value={filter.urgency||''} onChange={e=>set({urgency:e.target.value||undefined})}><option value="">所有優先程度</option><option value="high">高優先</option><option value="normal">一般</option><option value="low">低優先</option></select>
+        <input className="input max-w-40" aria-label="分類篩選" placeholder="精確分類名稱" maxLength={60} value={filter.category||''} onChange={e=>set({category:e.target.value||undefined})}/>
+        <select className="input w-auto" aria-label="回覆草稿篩選" value={filter.review_only?'review':''} onChange={e=>set({review_only:e.target.value?'true':undefined})}><option value="">全部回覆狀態</option><option value="review">有待審草稿</option></select>
         {filtered && (
           <button
             className="btn btn-ghost"
@@ -357,6 +365,7 @@ export function InboxPage() {
                       </span>
                       <span className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                         <span className="mail-routing">{item.site_name}</span>
+                        {item.is_test&&<span>安裝測試</span>}{item.category&&<span>{item.category}</span>}{item.urgency==="high"&&<span className="text-brand-700">高優先</span>}
                         {item.note_count > 0 && (
                           <span
                             className="inline-flex items-center gap-1"

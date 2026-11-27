@@ -6,6 +6,7 @@ use tokio::net::TcpListener;
 
 const USAGE: &str = "用法：
   feedback-inbox                          啟動伺服器
+  feedback-inbox rotate-ai-encryption-key  離線重新加密 AI 與會員簽章密鑰（環境變數提供新金鑰）
   feedback-inbox reset-password <帳號>    重設某個帳號的密碼，新密碼會印在畫面上
   feedback-inbox demo                     在空的資料庫裡建立範例帳號、網站和訊息，密碼會印在畫面上
                                          （要自己指定密碼的話設 FI_DEMO_PASSWORD）
@@ -24,6 +25,7 @@ async fn main() -> Result<()> {
             None => bail!("{USAGE}"),
         },
         Some("demo") => seed_demo(Config::from_env()?).await,
+        Some("rotate-ai-encryption-key") => rotate_ai_key(Config::from_env()?).await,
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
             Ok(())
@@ -52,10 +54,14 @@ async fn serve(config: Config) -> Result<()> {
     let listener = TcpListener::bind(&bind).await?;
     tracing::info!("網頁介面：http://{}", listener.local_addr()?);
     // 要知道連進來的 IP，表單的流量限制才有辦法算
+    let (stop, shutdown) = tokio::sync::watch::channel(false);
+    let worker = tokio::spawn(feedback_inbox::jobs::run_worker(state.clone(), shutdown));
     let service = app(state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, service)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+    let _ = stop.send(true);
+    worker.await?;
     tracing::info!("已停止");
     Ok(())
 }
@@ -115,4 +121,24 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+async fn rotate_ai_key(config: Config) -> Result<()> {
+    use base64::Engine;
+    let encoded = feedback_inbox::config::var("FI_AI_NEW_SECRET_KEY").ok_or_else(|| {
+        anyhow::anyhow!("請用環境變數 FI_AI_NEW_SECRET_KEY 提供新的 32 位元組 Base64 金鑰")
+    })?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|_| anyhow::anyhow!("新的加密金鑰格式不符"))?;
+    let key: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("新的加密金鑰必須是 32 位元組"))?;
+    let state = build_state(config).await?;
+    let count =
+        feedback_inbox::ai::secrets::reencrypt(&state, &feedback_inbox::config::EncryptionKey(key))
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e.public_parts().1))?;
+    println!("已重新加密 {count} 筆憑證。請將部署 FI_AI_SECRET_KEY 換成新值，再啟動服務並重新測試供應商。沒有印出任何密鑰。");
+    Ok(())
 }

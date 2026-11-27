@@ -26,6 +26,8 @@ struct SiteRow {
     url: String,
     key: String,
     allowed_origins: String,
+    origin_mode: String,
+    embed_origins: String,
     required_fields: String,
     redirect_url: String,
     webhook_url: String,
@@ -52,6 +54,8 @@ pub struct Site {
     url: String,
     key: String,
     allowed_origins: Vec<String>,
+    origin_mode: String,
+    embed_origins: Vec<String>,
     required_fields: Vec<String>,
     redirect_url: String,
     /// 只有管理員拿得到；其他人是空字串
@@ -67,11 +71,11 @@ pub struct Site {
 }
 
 const SITE_SELECT: &str =
-    "SELECT s.id, s.name, s.url, s.key, s.allowed_origins, s.required_fields, s.redirect_url,
+    "SELECT s.id, s.name, s.url, s.key, s.allowed_origins, s.origin_mode, s.embed_origins, s.required_fields, s.redirect_url,
         s.webhook_url, s.notify_email, s.active, s.created_at,
-        (SELECT COUNT(*) FROM feedback f WHERE f.site_id = s.id) AS total,
+        (SELECT COUNT(*) FROM feedback f WHERE f.is_test=0 AND f.site_id = s.id) AS total,
         (SELECT COUNT(*) FROM feedback f
-          WHERE f.site_id = s.id AND f.status IN ('new', 'in_progress')) AS unhandled
+          WHERE f.is_test=0 AND f.site_id = s.id AND f.status IN ('new', 'in_progress')) AS unhandled
      FROM sites s";
 
 pub fn parse_list(json: &str) -> Vec<String> {
@@ -105,6 +109,8 @@ fn present(row: SiteRow, members: Vec<Member>, admin: bool) -> Site {
         url: row.url,
         key: row.key,
         allowed_origins: parse_list(&row.allowed_origins),
+        origin_mode: row.origin_mode,
+        embed_origins: parse_list(&row.embed_origins),
         required_fields: parse_list(&row.required_fields),
         redirect_url: row.redirect_url,
         has_webhook: !row.webhook_url.is_empty(),
@@ -192,6 +198,8 @@ pub struct SiteBody {
     name: Option<String>,
     url: Option<String>,
     allowed_origins: Option<Vec<String>>,
+    origin_mode: Option<String>,
+    embed_origins: Option<Vec<String>>,
     required_fields: Option<Vec<String>>,
     redirect_url: Option<String>,
     webhook_url: Option<String>,
@@ -329,6 +337,14 @@ pub async fn create(
     .execute(&state.db)
     .await?
     .last_insert_rowid();
+    crate::forms::ensure_site(&state.db, id).await?;
+    if let Some(origins) = &body.embed_origins {
+        sqlx::query("UPDATE sites SET embed_origins=? WHERE id=?")
+            .bind(clean_origins(origins)?)
+            .bind(id)
+            .execute(&state.db)
+            .await?;
+    }
     // 沒指定負責人時，先放建立的人
     let member_ids = body.member_ids.unwrap_or_else(|| vec![admin.id]);
     set_members(&state, id, &member_ids).await?;
@@ -342,6 +358,16 @@ pub async fn update(
     Json(body): Json<SiteBody>,
 ) -> AppResult<Json<Site>> {
     let current = one(&state, &admin, id).await?;
+    crate::forms::ensure_site(&state.db, id).await?;
+    let mode = body.origin_mode.as_deref().unwrap_or(&current.origin_mode);
+    if mode != "exact" && !(mode == "legacy_public" && current.origin_mode == "legacy_public") {
+        return Err(AppError::bad("新的表單僅能使用精確來源限制"));
+    }
+    let embeds = clean_origins(
+        body.embed_origins
+            .as_deref()
+            .unwrap_or(&current.embed_origins),
+    )?;
     let name = match &body.name {
         Some(name) => clean_name(name)?,
         None => current.name.clone(),
@@ -371,9 +397,10 @@ pub async fn update(
         Some(url) => clean_url(url, "Webhook 網址")?,
         None => current.webhook_url.clone(),
     };
+    let mut tx = state.db.begin().await?;
     sqlx::query(
         "UPDATE sites SET name = ?, url = ?, allowed_origins = ?, required_fields = ?,
-            redirect_url = ?, webhook_url = ?, notify_email = ?, active = ?
+            redirect_url = ?, webhook_url = ?, notify_email = ?, active = ?, origin_mode = ?, embed_origins = ?
          WHERE id = ?",
     )
     .bind(name)
@@ -384,9 +411,14 @@ pub async fn update(
     .bind(webhook_url)
     .bind(body.notify_email.unwrap_or(current.notify_email))
     .bind(body.active.unwrap_or(current.active))
+    .bind(mode).bind(embeds)
     .bind(id)
-    .execute(&state.db)
+    .execute(&mut *tx)
     .await?;
+    if let Some(fields) = &body.required_fields {
+        crate::forms::publish_required(&mut tx, id, fields, admin.id).await?;
+    }
+    tx.commit().await?;
     if let Some(member_ids) = &body.member_ids {
         set_members(&state, id, member_ids).await?;
     }

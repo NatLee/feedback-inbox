@@ -18,11 +18,23 @@ pub enum AppError {
     /// 登入失敗太多次。
     TooManyRequests(String),
     Internal(anyhow::Error),
+    Coded {
+        status: u16,
+        code: String,
+        message: String,
+    },
 }
 
 pub type AppResult<T> = Result<T, AppError>;
 
 impl AppError {
+    pub fn coded(status: u16, code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Coded {
+            status,
+            code: code.into(),
+            message: message.into(),
+        }
+    }
     pub fn bad(msg: impl Into<String>) -> Self {
         Self::BadRequest(msg.into())
     }
@@ -37,24 +49,44 @@ impl AppError {
     }
 }
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        let (status, msg) = match self {
-            AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, m),
-            AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m),
-            AppError::Forbidden(m) => (StatusCode::FORBIDDEN, m),
-            AppError::NotFound(m) => (StatusCode::NOT_FOUND, m),
-            AppError::Conflict(m) => (StatusCode::CONFLICT, m),
-            AppError::TooManyRequests(m) => (StatusCode::TOO_MANY_REQUESTS, m),
-            AppError::Internal(err) => {
+impl AppError {
+    pub fn public_parts(self) -> (StatusCode, String, Option<String>) {
+        let (status, message, code) = match self {
+            Self::Coded {
+                status,
+                code,
+                message,
+            } => (
+                StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                message,
+                Some(code),
+            ),
+            Self::BadRequest(m) => (StatusCode::BAD_REQUEST, m, None),
+            Self::Unauthorized(m) => (StatusCode::UNAUTHORIZED, m, None),
+            Self::Forbidden(m) => (StatusCode::FORBIDDEN, m, None),
+            Self::NotFound(m) => (StatusCode::NOT_FOUND, m, None),
+            Self::Conflict(m) => (StatusCode::CONFLICT, m, None),
+            Self::TooManyRequests(m) => (StatusCode::TOO_MANY_REQUESTS, m, None),
+            Self::Internal(err) => {
                 tracing::error!("internal error: {err:#}");
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    "伺服器內部錯誤，請查看伺服器 log".to_string(),
+                    "伺服器內部錯誤，請稍後重試".into(),
+                    None,
                 )
             }
         };
-        (status, Json(json!({ "error": msg }))).into_response()
+        (status, message, code)
+    }
+}
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, message, code) = self.public_parts();
+        let mut body = json!({"error":message});
+        if let Some(code) = code {
+            body["code"] = json!(code);
+        }
+        (status, Json(body)).into_response()
     }
 }
 

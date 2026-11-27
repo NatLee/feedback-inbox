@@ -1,3 +1,4 @@
+import {FeedbackWorkflow} from "../ai/FeedbackWorkflow";
 import {
   ArrowLeft,
   Building2,
@@ -355,6 +356,8 @@ export function FeedbackDetailPage() {
                     {senderName(data)} <StatusBadge status={data.status} />
                   </h1>
                   <Contact detail={data} />
+                  <p className="hint mt-3">{data.identity?.email_verified?'會員 Email 已由網站後端驗證':'聯絡資料由訪客自行填寫，尚未驗證'}{data.identity?.subject&&` · 會員 ${data.identity.subject}`}</p>
+                  {data.is_test&&<span className="ai-stamp mt-2">安裝測試訊息</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   {busy && <Spinner />}
@@ -393,7 +396,8 @@ export function FeedbackDetailPage() {
                   </span>
                 )}
               </p>
-              {data.extra.length > 0 && (
+              {data.form && <dl className="mt-4 grid gap-x-4 gap-y-2 rounded-lg bg-zinc-50 p-3 text-sm sm:grid-cols-[auto_1fr] dark:bg-zinc-800/60">{data.form.schema.fields.filter(f=>!['name','email','phone','company','message'].includes(f.key)).map(f=><div className="contents" key={f.id}><dt className="text-zinc-500">{f.label}</dt><dd className="break-words whitespace-pre-wrap">{typeof data.answers?.[f.id]==='boolean'?(data.answers[f.id]?'是':'否'):(f.type==='select'?f.options.find(o=>o.value===data.answers?.[f.id])?.label:undefined)??String(data.answers?.[f.id]??'—')}</dd></div>)}<dt className="hint">來源表單版本</dt><dd className="hint">v{data.form.version}</dd></dl>}
+              {!data.form && data.extra.length > 0 && (
                 <dl className="mt-4 grid gap-x-4 gap-y-2 rounded-lg bg-zinc-50 p-3 text-sm sm:grid-cols-[auto_1fr] dark:bg-zinc-800/60">
                   {data.extra.map((field) => (
                     <div key={field.name} className="contents">
@@ -408,6 +412,7 @@ export function FeedbackDetailPage() {
                 </dl>
               )}
             </section>
+            <FeedbackWorkflow detail={data} admin={me.role==="admin"} onClassified={reload}/>
             <Notes
               detail={data}
               onChange={(next) => (next ? setData(next) : void reload())}

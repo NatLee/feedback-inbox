@@ -76,6 +76,7 @@ mod tests {
             trust_proxy: false,
             rate_limit: 0,
             smtp: None,
+            workflow: Default::default(),
         })
         .await
         .unwrap();

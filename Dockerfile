@@ -12,9 +12,11 @@ RUN pnpm build
 
 # 2. 後端
 FROM rust:1-trixie AS api
+ENV CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
 WORKDIR /workspace/src/api
 COPY src/api/Cargo.toml src/api/Cargo.lock ./
 COPY crates/access-kit /workspace/crates/access-kit
+COPY crates/ai-kit /workspace/crates/ai-kit
 COPY src/api/migrations ./migrations
 COPY src/api/src ./src
 RUN cargo build --release --locked

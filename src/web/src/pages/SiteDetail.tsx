@@ -1,13 +1,16 @@
-import { ArrowLeft, BellRing, Check, CheckCircle2, Copy, ExternalLink, Inbox, RefreshCw, Trash2, XCircle } from "lucide-react";
+import {SiteAi} from "../ai/SiteAi";
+import { FormBuilder } from "../forms/FormBuilder";
+import { Integrations } from "../forms/Integrations";
+import { ArrowLeft, BellRing, CheckCircle2, Inbox, Trash2, XCircle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api";
 import { PageBody } from "../components/Layout";
 import { Badge, ErrorBanner, Loading, PageHeader, Spinner, useToast } from "../components/ui";
 import { useApp, useUser } from "../context";
-import { FIELDS, FIELD_LABEL, parseLines } from "../lib/format";
+import { FIELD_LABEL, parseLines } from "../lib/format";
 import { errorText, useAsync } from "../lib/hooks";
-import type { Account, Field, Site, TestResult } from "../types";
+import type { Account, Site, TestResult } from "../types";
 
 function Section({ title, hint, actions, children }: { title: string; hint?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -21,108 +24,6 @@ function Section({ title, hint, actions, children }: { title: string; hint?: Rea
       </div>
       {children}
     </section>
-  );
-}
-
-function CopyButton({ text, label = "複製" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  const toast = useToast();
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast("瀏覽器不讓我們複製，請自己選取文字", "error");
-    }
-  };
-  return (
-    <button type="button" className="btn btn-secondary px-2 py-1 text-xs" onClick={() => void copy()}>
-      {copied ? <Check className="size-4" /> : <Copy className="size-4" />} {copied ? "複製了" : label}
-    </button>
-  );
-}
-
-function Snippet({ title, code }: { title: string; code: string }) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">{title}</h3>
-        <CopyButton text={code} />
-      </div>
-      <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-3 font-mono text-xs leading-5 text-zinc-100 dark:bg-zinc-950 dark:ring-1 dark:ring-zinc-800">
-        {code}
-      </pre>
-    </div>
-  );
-}
-
-function htmlSnippet(endpoint: string, required: Field[]): string {
-  const req = (f: Field) => (required.includes(f) ? " required" : "");
-  return `<form action="${endpoint}" method="post">
-  <input name="name" placeholder="姓名"${req("name")}>
-  <input name="email" type="email" placeholder="電子信箱"${req("email")}>
-  <textarea name="message" placeholder="想說的話"${req("message")}></textarea>
-  <!-- 人看不到、機器人會填的欄位：有填就當成垃圾訊息 -->
-  <input name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
-  <button>送出</button>
-</form>`;
-}
-
-function fetchSnippet(endpoint: string): string {
-  return `const res = await fetch("${endpoint}", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name, email, message }),
-});
-if (!res.ok) alert((await res.json()).error);`;
-}
-
-/** 表單網址和貼到網頁上的寫法。 */
-function Embed({ site, onRotated }: { site: Site; onRotated: (site: Site) => void }) {
-  const admin = useUser().role === "admin";
-  const { meta } = useApp();
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const endpoint = `${meta?.public_url || window.location.origin}/f/${site.key}`;
-
-  const rotate = async () => {
-    if (!window.confirm("換一個新的表單網址？舊的網址馬上失效，網頁上的表單要跟著改。")) return;
-    setBusy(true);
-    try {
-      onRotated(await api.rotateKey(site.id));
-      toast("換好了，記得更新網頁上的表單");
-    } catch (e) {
-      toast(errorText(e), "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Section title="表單網址" hint="把表單送到這個網址，訊息就會進收件匣。">
-      <div className="flex flex-col gap-4 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 truncate rounded-lg bg-zinc-100 px-3 py-2 font-mono text-sm dark:bg-zinc-800">{endpoint}</code>
-          <CopyButton text={endpoint} />
-          <a className="btn btn-secondary px-2 py-1 text-xs" href={endpoint} target="_blank" rel="noreferrer noopener">
-            <ExternalLink className="size-4" /> 現成的表單頁
-          </a>
-          {admin && (
-            <button className="btn btn-secondary px-2 py-1 text-xs" disabled={busy} onClick={() => void rotate()}>
-              {busy ? <Spinner className="size-3.5" /> : <RefreshCw className="size-4" />} 換網址
-            </button>
-          )}
-        </div>
-        <Snippet title="HTML 表單" code={htmlSnippet(endpoint, site.required_fields)} />
-        <Snippet title="用 JavaScript 送（JSON）" code={fetchSnippet(endpoint)} />
-        <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-          認得的欄位是 <code className="font-mono">name</code>、<code className="font-mono">email</code>、
-          <code className="font-mono">phone</code>、<code className="font-mono">company</code>、
-          <code className="font-mono">message</code>；其他欄位會原樣留在訊息裡。還沒有自己的網頁的話，「現成的表單頁」可以直接把連結給人填。
-        </p>
-      </div>
-    </Section>
   );
 }
 
@@ -167,7 +68,8 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
   const [name, setName] = useState(site.name);
   const [url, setUrl] = useState(site.url);
   const [active, setActive] = useState(site.active);
-  const [required, setRequired] = useState<Set<Field>>(new Set(site.required_fields));
+  const [exact, setExact] = useState(site.origin_mode === "exact");
+  const [embeds, setEmbeds] = useState(site.embed_origins.join("\n"));
   const [origins, setOrigins] = useState(site.allowed_origins.join("\n"));
   const [redirectUrl, setRedirectUrl] = useState(site.redirect_url);
   const [notifyEmail, setNotifyEmail] = useState(site.notify_email);
@@ -193,7 +95,8 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
           name: name.trim(),
           url: url.trim(),
           active,
-          required_fields: FIELDS.filter((f) => required.has(f)),
+          origin_mode: exact ? "exact" : undefined,
+          embed_origins: parseLines(embeds),
           allowed_origins: parseLines(origins),
           redirect_url: redirectUrl.trim(),
           notify_email: notifyEmail,
@@ -267,23 +170,6 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
               onChange={(e) => setUrl(e.target.value)}
             />
           </div>
-          <fieldset className="sm:col-span-2">
-            <legend className="label">必填欄位</legend>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {FIELDS.map((f) => (
-                <label key={f} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-brand-600"
-                    checked={required.has(f)}
-                    onChange={() => setRequired((s) => toggle(s, f))}
-                  />
-                  {FIELD_LABEL[f]}
-                </label>
-              ))}
-            </div>
-            <p className="hint">少了必填欄位的表單會被退回，不會進收件匣。</p>
-          </fieldset>
           <div className="sm:col-span-2">
             <label className="label" htmlFor="site-origins">
               允許的來源
@@ -295,7 +181,10 @@ function SettingsForm({ site, accounts, onSaved }: { site: Site; accounts: Accou
               value={origins}
               onChange={(e) => setOrigins(e.target.value)}
             />
-            <p className="hint">一行一個。有填的話，只收從這些網站送來的表單；留白就不限制。</p>
+            <p className="hint">一行一個完整來源（包含 http/https 與連接埠）。精確模式留白時，只能使用本站分享表單。</p>
+            {site.origin_mode === "legacy_public" && <label className="mt-2 flex gap-2 text-sm"><input type="checkbox" checked={exact} onChange={e=>setExact(e.target.checked)}/>將舊版公開模式改為精確來源限制</label>}
+          </div>
+          <div className="sm:col-span-2"><label className="label" htmlFor="site-embeds">允許嵌入的來源</label><textarea id="site-embeds" className="input font-mono text-xs" value={embeds} onChange={e=>setEmbeds(e.target.value)} placeholder="https://www.example.com"/><p className="hint">獨立於送出來源。留白停用 iframe，管理頁永遠不能嵌入。</p>
           </div>
           <div className="sm:col-span-2">
             <label className="label" htmlFor="site-redirect">
@@ -430,7 +319,7 @@ function Summary({ site }: { site: Site }) {
         </div>
         <div>
           <dt className="text-xs text-zinc-500 dark:text-zinc-400">允許的來源</dt>
-          <dd className="break-all">{site.allowed_origins.join("、") || "不限制"}</dd>
+          <dd className="break-all">{site.allowed_origins.join("、") || (site.origin_mode === "legacy_public" ? "舊版公開模式" : "只接受本站表單")}</dd>
         </div>
       </dl>
     </Section>
@@ -439,6 +328,7 @@ function Summary({ site }: { site: Site }) {
 
 export function SiteDetailPage() {
   const id = Number(useParams().id);
+  const [tab,setTab]=useState<"form"|"integrations"|"ai"|"settings">("form");
   const admin = useUser().role === "admin";
   const { data: site, setData, error } = useAsync(() => api.site(id), [id]);
   // 只有管理員拿得到帳號清單
@@ -467,12 +357,11 @@ export function SiteDetailPage() {
             }
           />
           <div className="flex flex-col gap-4">
-            <Embed site={site} onRotated={setData} />
-            {admin ? (
-              accounts.data && <SettingsForm key={site.id} site={site} accounts={accounts.data} onSaved={setData} />
-            ) : (
-              <Summary site={site} />
-            )}
+            <nav className="flex flex-wrap gap-2" aria-label="網站設定分頁">{([['form','表單'],['integrations','發布與嵌入'],['ai','AI 與回覆'],['settings','通知與負責人']] as const).map(([key,label])=><button key={key} className={`btn ${tab===key?'btn-primary':'btn-secondary'}`} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
+            {tab==='form' && <FormBuilder siteId={site.id} admin={admin}/>}
+            {tab==='integrations' && <Integrations site={site} admin={admin} onChanged={setData}/>}
+            {tab==='ai' && <SiteAi siteId={site.id} admin={admin}/>}
+            {tab==='settings' && (admin ? accounts.data && <SettingsForm key={site.id} site={site} accounts={accounts.data} onSaved={setData}/> : <Summary site={site}/>)}
           </div>
         </>
       )}

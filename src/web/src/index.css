@@ -1450,3 +1450,28 @@ body {
 .first-login-note { margin-bottom: 24px; padding: 16px; border: 1px solid currentColor; border-radius: 4px; }
 .first-login-note .eyebrow { margin-bottom: 8px; font-size: 10px; }
 .first-login-note p:last-child { font-size: 12px; line-height: 1.8; }
+
+/* Optional AI remains part of the correspondence desk: ruled paper, stamps and exact recipients. */
+.ai-section { margin-bottom: 1.25rem; overflow: hidden; }
+.ai-section-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; border-bottom:1px solid var(--desk-rule,#ded7ca); padding:1.3rem 1.5rem; }
+.ai-section-heading h2 { margin-top:.5rem; font-size:1.2rem; letter-spacing:-.025em; }
+.ai-section-heading p { max-width:48rem; margin-top:.5rem; font-size:.82rem; line-height:1.8; color:#746c61; }
+.ai-section-body { padding:1.4rem 1.5rem; }
+.ai-stamp { display:inline-flex; align-items:center; gap:.35rem; border:1px solid currentColor; border-radius:2px; padding:.2rem .5rem; font-size:.65rem; letter-spacing:.04em; line-height:1.5; color:#6e7563; white-space:nowrap; }
+.ai-stamp-alert { color:#a53f2a; }
+.ai-provider-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:1rem; }
+.ai-provider-card { border:1px solid #ded7ca; padding:1.2rem; background:linear-gradient(135deg,#fffcf7,#f8f3e9); }
+.ai-editor { border:1px solid #d4cbbc; border-left:3px solid #b5412b; padding:1.2rem; background:#faf7f0; }
+.ai-notice { border-left:3px solid #b5412b; padding:.8rem 1rem; background:#faf0e4; font-size:.82rem; line-height:1.8; }
+.ai-empty { border:1px dashed #cfc6b6; padding:1.7rem; font-size:.85rem; color:#746c61; line-height:1.8; }
+.ai-rule-line { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; border-bottom:1px solid #ded7ca; padding:1rem 0; }
+.ai-reply-sheet { background:repeating-linear-gradient(transparent,transparent 31px,#ded7ca55 32px); padding:1.4rem; border:1px solid #d4cbbc; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.9rem; line-height:2; }
+.ai-evidence { border-left:2px solid #b5412b; padding:.6rem 1rem; margin:.7rem 0; font-size:.85rem; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; }
+.dark .ai-section-heading,.dark .ai-rule-line { border-color:#494238; }
+.dark .ai-section-heading p,.dark .ai-empty { color:#b7ac9b; }
+.dark .ai-provider-card { background:#29261f; border-color:#494238; }
+.dark .ai-editor { background:#26231e; border-color:#51473c; border-left-color:#e77d5c; }
+.dark .ai-notice { background:#34291e; }
+.dark .ai-reply-sheet { border-color:#51473c; background:repeating-linear-gradient(transparent,transparent 31px,#51473c55 32px); }
+.dark .ai-stamp { color:#b2bba4; }.dark .ai-stamp-alert{color:#f1a78a;}
+@media(max-width:640px){.ai-section-heading,.ai-section-body{padding:1rem;}.ai-editor{padding:.9rem;}}

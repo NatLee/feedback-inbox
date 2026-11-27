@@ -1,0 +1,39 @@
+# Disposable verification override; do not use this fixed fixture encryption key in production.
+services:
+  feedback-inbox:
+    image: feedback-inbox-workflow-api:local
+    container_name: feedback-inbox-workflow-api
+    restart: "no"
+    environment:
+      FI_PUBLIC_URL: http://127.0.0.1:18987
+      ACCESS_PUBLIC_URL: http://127.0.0.1:18987
+      FI_AI_SECRET_KEY: BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=
+      FI_AI_ALLOWED_OLLAMA_ORIGINS: http://ai-fixture:11434
+      FI_AI_AUTO_SEND_ENABLED: "true"
+      FI_AI_CONCURRENCY: "2"
+      FI_RATE_LIMIT: "0"
+      FI_SMTP_HOST: mailpit
+      FI_SMTP_PORT: "1025"
+      FI_SMTP_FROM: Feedback Desk <desk@example.test>
+      FI_SMTP_TLS: none
+    depends_on:
+      - ai-fixture
+      - mailpit
+  nginx:
+    image: feedback-inbox-workflow-web:local
+    container_name: feedback-inbox-workflow-web
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:18987:80"
+  mailpit:
+    container_name: feedback-inbox-workflow-mailpit
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:18025:8025"
+  ai-fixture:
+    image: python:3.13-slim
+    container_name: feedback-inbox-workflow-model
+    restart: "no"
+    command: ["python", "/fixture/ai-provider.py"]
+    volumes:
+      - ./docs/fixtures:/fixture:ro

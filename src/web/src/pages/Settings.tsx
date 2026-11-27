@@ -1,3 +1,4 @@
+import {Providers} from "../ai/Providers";
 import { AccountRegistrationStatus } from "../registration/AccountRegistrationStatus";
 import { RegistrationAdmin } from "../registration/RegistrationAdmin";
 import { KeyRound, Pencil, UserPlus } from "lucide-react";
@@ -443,6 +444,7 @@ export function Settings() {
       <PageHeader title="設定" subtitle={admin ? "你的帳號，以及團隊的帳號。" : "你的帳號。"} />
       <Profile />
       <Password />
+      {admin && <Providers />}
       {admin && <RegistrationAdmin onReviewed={() => void accounts.reload()} />}
       {admin && <Accounts accounts={accounts.data} error={accounts.error} reload={accounts.reload} />}
     </PageBody>

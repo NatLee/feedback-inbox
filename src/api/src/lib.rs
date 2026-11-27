@@ -3,17 +3,21 @@
 
 pub mod access;
 pub mod access_registry;
+pub mod ai;
 pub mod auth;
 pub mod config;
 pub mod db;
 pub mod demo;
 pub mod error;
+pub mod forms;
 pub mod intake;
+pub mod jobs;
 pub mod logging;
 pub mod notify;
 pub mod ratelimit;
 pub mod routes;
 pub mod state;
+pub mod workflow_audit;
 
 use std::sync::Arc;
 
